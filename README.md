@@ -1,36 +1,178 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+thumblify-next/
+│
+├── public/
+│   ├── images/
+│   ├── icons/
+│   ├── logo/
+│   └── placeholders/
+│
+├── src/
+│   │
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   ├── globals.css
+│   │   ├── providers.tsx
+│   │   ├── loading.tsx
+│   │   ├── error.tsx
+│   │   ├── not-found.tsx
+│   │   ├── robots.ts
+│   │   ├── sitemap.ts
+│   │   │
+│   │   ├── (marketing)/
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── (auth)/
+│   │   │   ├── layout.tsx
+│   │   │   └── login/
+│   │   │       └── page.tsx
+│   │   │
+│   │   ├── (dashboard)/
+│   │   │   ├── layout.tsx
+│   │   │   │
+│   │   │   ├── generate/
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx
+│   │   │   │
+│   │   │   ├── my-generation/
+│   │   │   │   └── page.tsx
+│   │   │   │
+│   │   │   └── preview/
+│   │   │       └── page.tsx
+│   │   │
+│   │   └── api/
+│   │       ├── auth/
+│   │       │   ├── login/
+│   │       │   │   └── route.ts
+│   │       │   ├── logout/
+│   │       │   │   └── route.ts
+│   │       │   ├── register/
+│   │       │   │   └── route.ts
+│   │       │   └── session/
+│   │       │       └── route.ts
+│   │       │
+│   │       ├── thumbnails/
+│   │       │   ├── route.ts
+│   │       │   ├── generate/
+│   │       │   │   └── route.ts
+│   │       │   └── [id]/
+│   │       │       └── route.ts
+│   │       │
+│   │       └── users/
+│   │           └── me/
+│   │               └── route.ts
+│   │
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Navbar.tsx
+│   │   │   └── Footer.tsx
+│   │   │
+│   │   ├── providers/
+│   │   │   ├── AuthProvider.tsx
+│   │   │   ├── LenisProvider.tsx
+│   │   │   └── ToastProvider.tsx
+│   │   │
+│   │   ├── sections/
+│   │   │   ├── HeroSection.tsx
+│   │   │   ├── FeaturesSection.tsx
+│   │   │   ├── TestimonialSection.tsx
+│   │   │   ├── PricingSection.tsx
+│   │   │   ├── ContactSection.tsx
+│   │   │   └── CTASection.tsx
+│   │   │
+│   │   ├── thumbnail/
+│   │   │   ├── PreviewPanel.tsx
+│   │   │   ├── TitleImage.tsx
+│   │   │   ├── AspectRatioSelector.tsx
+│   │   │   ├── ColorSchemeSelector.tsx
+│   │   │   └── StyleSelector.tsx
+│   │   │
+│   │   ├── auth/
+│   │   │   └── LoginForm.tsx
+│   │   │
+│   │   └── ui/
+│   │       ├── Button.tsx
+│   │       ├── Input.tsx
+│   │       ├── Modal.tsx
+│   │       ├── Spinner.tsx
+│   │       └── SectionTitle.tsx
+│   │
+│   ├── actions/
+│   │   ├── auth.actions.ts
+│   │   └── thumbnail.actions.ts
+│   │
+│   ├── lib/
+│   │   ├── db/
+│   │   │   └── connect-db.ts
+│   │   │
+│   │   ├── auth/
+│   │   │   ├── session.ts
+│   │   │   ├── password.ts
+│   │   │   ├── get-current-user.ts
+│   │   │   └── require-user.ts
+│   │   │
+│   │   ├── ai/
+│   │   │   ├── client.ts
+│   │   │   ├── generate-thumbnail.ts
+│   │   │   └── prompt-builder.ts
+│   │   │
+│   │   ├── storage/
+│   │   │   ├── image-storage.ts
+│   │   │   └── delete-image.ts
+│   │   │
+│   │   ├── services/
+│   │   │   ├── auth.service.ts
+│   │   │   ├── thumbnail.service.ts
+│   │   │   └── user.service.ts
+│   │   │
+│   │   ├── repositories/
+│   │   │   ├── user.repository.ts
+│   │   │   └── thumbnail.repository.ts
+│   │   │
+│   │   ├── validations/
+│   │   │   ├── auth.schema.ts
+│   │   │   └── thumbnail.schema.ts
+│   │   │
+│   │   ├── api/
+│   │   │   ├── api-response.ts
+│   │   │   └── api-error.ts
+│   │   │
+│   │   └── utils/
+│   │       ├── format-date.ts
+│   │       └── generate-file-name.ts
+│   │
+│   ├── models/
+│   │   ├── User.ts
+│   │   ├── Thumbnail.ts
+│   │   └── Session.ts
+│   │
+│   ├── hooks/
+│   │   ├── useAuth.ts
+│   │   └── useThumbnail.ts
+│   │
+│   ├── data/
+│   │   ├── features.ts
+│   │   ├── pricing.ts
+│   │   ├── testimonials.ts
+│   │   ├── navlinks.ts
+│   │   └── footer.ts
+│   │
+│   ├── config/
+│   │   ├── site.ts
+│   │   └── env.ts
+│   │
+│   └── types/
+│       ├── auth.types.ts
+│       ├── thumbnail.types.ts
+│       └── api.types.ts
+│
+├── .env.local
+├── .env.example
+├── .gitignore
+├── eslint.config.mjs
+├── next.config.ts
+├── package.json
+├── proxy.ts
+├── tsconfig.json
+└── README.md
