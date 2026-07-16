@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 
-export default function MarketingLayout({
+export default function DashboardLayout({
     children,
 }: Readonly<{
     children: ReactNode;
@@ -11,9 +11,7 @@ export default function MarketingLayout({
     return (
         <>
             <Navbar />
-
             {children}
-
             <Footer />
         </>
     );

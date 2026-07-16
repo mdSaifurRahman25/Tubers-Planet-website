@@ -4,6 +4,8 @@ import FeaturesSection from "@/components/sections/FeaturesSection";
 import HeroSection from "@/components/sections/HeroSection";
 import PricingSection from "@/components/sections/PricingSection";
 import TestimonialSection from "@/components/sections/TestimonialSection";
+import ContactSection from "@/components/sections/ContactSection";
+import CTASection from "@/components/sections/CTASection";
 
 export const metadata: Metadata = {
     title: "AI YouTube Thumbnail Generator",
@@ -18,6 +20,8 @@ export default function HomePage() {
             <FeaturesSection />
             <TestimonialSection />
             <PricingSection />
+            <ContactSection />
+            <CTASection />
         </main>
     );
 }

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Toaster } from "react-hot-toast";
 
+import LenisScroll from "@/components/providers/LenisScroll";
 import { AuthProvider } from "@/context/AuthContext";
 
 export default function Providers({
@@ -12,6 +13,8 @@ export default function Providers({
 }) {
     return (
         <AuthProvider>
+            <LenisScroll />
+
             {children}
 
             <Toaster

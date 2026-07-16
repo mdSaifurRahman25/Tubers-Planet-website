@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import "lenis/dist/lenis.css";
 import "./globals.css";
+
 import Providers from "./providers";
 
 export const metadata: Metadata = {
@@ -9,7 +11,8 @@ export const metadata: Metadata = {
     default: "Thumblify",
     template: "%s | Thumblify",
   },
-  description: "AI-powered YouTube thumbnail generator.",
+  description:
+    "Create professional YouTube thumbnails with AI.",
 };
 
 export default function RootLayout({
