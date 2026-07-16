@@ -1,0 +1,23 @@
+import type { Metadata } from "next";
+
+import FeaturesSection from "@/components/sections/FeaturesSection";
+import HeroSection from "@/components/sections/HeroSection";
+import PricingSection from "@/components/sections/PricingSection";
+import TestimonialSection from "@/components/sections/TestimonialSection";
+
+export const metadata: Metadata = {
+    title: "AI YouTube Thumbnail Generator",
+    description:
+        "Create professional, high-converting YouTube thumbnails with Thumblify's AI-powered thumbnail generator.",
+};
+
+export default function HomePage() {
+    return (
+        <main>
+            <HeroSection />
+            <FeaturesSection />
+            <TestimonialSection />
+            <PricingSection />
+        </main>
+    );
+}

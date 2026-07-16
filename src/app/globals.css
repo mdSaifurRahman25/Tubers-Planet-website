@@ -1,2 +1,51 @@
 @import "tailwindcss";
 
+:root {
+color-scheme: dark;
+}
+
+html {
+min-height: 100%;
+background-color: #000000;
+scroll-behavior: smooth;
+}
+
+body {
+min-height: 100vh;
+margin: 0;
+background-color: #000000;
+color: #ffffff;
+}
+
+button,
+input,
+textarea,
+select {
+font: inherit;
+}
+
+a {
+text-decoration: none;
+}
+
+.move-gradient {
+background: linear-gradient(
+90deg,
+#ec4899,
+#f472b6,
+#db2777,
+#ec4899
+);
+background-size: 300% 100%;
+animation: move-gradient 5s linear infinite;
+}
+
+@keyframes move-gradient {
+0% {
+background-position: 0% 50%;
+}
+
+100% {
+background-position: 300% 50%;
+}
+}
