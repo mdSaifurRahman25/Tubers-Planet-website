@@ -383,7 +383,15 @@ export default function GenerateWorkspace({
         };
     };
 
-    const createEnhanceRequestOptions = (
+    /*
+     * Generate with references এবং
+     * Premium Enhance—দুটির জন্যই
+     * multipart/form-data request।
+     *
+     * Browser নিজে boundary-সহ Content-Type
+     * তৈরি করবে, তাই manual header নেই।
+     */
+    const createReferenceRequestOptions = (
         requestBody: ThumbnailRequestBody
     ): RequestInit => {
         const formData =
@@ -410,6 +418,43 @@ export default function GenerateWorkspace({
             credentials: "include",
             body: formData,
         };
+    };
+
+    const getRequestOptions = (
+        action: ThumbnailAction,
+        requestBody: ThumbnailRequestBody
+    ): RequestInit => {
+        /*
+         * Premium Enhance সবসময় FormData ব্যবহার
+         * করবে, কারণ backend request.formData()
+         * দিয়ে input গ্রহণ করে।
+         */
+        if (action === "enhance") {
+            return createReferenceRequestOptions(
+                requestBody
+            );
+        }
+
+        /*
+         * প্রথম Generate-এর সময় reference image
+         * থাকলে FormData পাঠানো হবে।
+         */
+        if (
+            action === "generate" &&
+            referenceImages.length > 0
+        ) {
+            return createReferenceRequestOptions(
+                requestBody
+            );
+        }
+
+        /*
+         * Image ছাড়া Generate এবং Regenerate
+         * JSON request ব্যবহার করবে।
+         */
+        return createJsonRequestOptions(
+            requestBody
+        );
     };
 
     const handleAction = async (
@@ -483,13 +528,10 @@ export default function GenerateWorkspace({
             createRequestBody();
 
         const requestOptions =
-            action === "enhance"
-                ? createEnhanceRequestOptions(
-                    requestBody
-                )
-                : createJsonRequestOptions(
-                    requestBody
-                );
+            getRequestOptions(
+                action,
+                requestBody
+            );
 
         setActiveAction(action);
 
@@ -517,7 +559,14 @@ export default function GenerateWorkspace({
                 data.thumbnail
             );
 
-            if (action === "enhance") {
+            /*
+             * Uploaded reference imageগুলো request
+             * complete হওয়ার পরে clear হবে।
+             */
+            if (
+                action === "generate" ||
+                action === "enhance"
+            ) {
                 setReferenceImages([]);
             }
 
@@ -597,7 +646,7 @@ export default function GenerateWorkspace({
                                     <p className="text-sm text-zinc-400">
                                         {isEditMode
                                             ? "Update the details, create a fresh version, or polish the current result."
-                                            : "Describe your vision and generate a professional thumbnail."}
+                                            : "Describe your idea, optionally add visual references, and generate a professional thumbnail."}
                                     </p>
                                 </div>
 
@@ -671,12 +720,36 @@ export default function GenerateWorkspace({
                                             handleDetailsChange
                                         }
                                         rows={6}
-                                        placeholder="Add correction instructions, specific elements, mood, layout or text requirements..."
+                                        placeholder="Add specific subjects, mood, layout, text placement, corrections or reference-image instructions..."
                                         className="w-full resize-none rounded-lg border border-white/10 bg-white/6 px-4 py-3 text-zinc-100 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-500"
                                     />
                                 </div>
 
-                                {isEditMode && (
+                                {/*
+                 * Uploader এখন Create এবং Edit—
+                 * দুই mode-এই দেখা যাবে।
+                 */}
+                                <div className="space-y-2">
+                                    {!isEditMode && (
+                                        <div className="rounded-lg border border-sky-400/20 bg-sky-400/8 px-3 py-2.5 text-xs leading-5 text-sky-200">
+                                            Optional: upload your own
+                                            photo, product, background,
+                                            or other visual references
+                                            before generating. The first
+                                            image will be the primary
+                                            reference.
+                                        </div>
+                                    )}
+
+                                    {isEditMode && (
+                                        <div className="rounded-lg border border-amber-400/20 bg-amber-400/8 px-3 py-2.5 text-xs leading-5 text-amber-200">
+                                            These reference images are
+                                            used by Premium Enhance.
+                                            Leave this empty to enhance
+                                            the current thumbnail.
+                                        </div>
+                                    )}
+
                                     <ReferenceImageUploader
                                         files={referenceImages}
                                         onChange={
@@ -690,33 +763,61 @@ export default function GenerateWorkspace({
                                             isFetchingThumbnail
                                         }
                                     />
-                                )}
+                                </div>
 
                                 {!isEditMode && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            void handleAction(
-                                                "generate"
-                                            )
-                                        }
-                                        disabled={
-                                            isSubmitting ||
-                                            isFetchingThumbnail ||
-                                            isAuthLoading
-                                        }
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <ZapIcon
-                                            aria-hidden="true"
-                                            className="size-4"
-                                        />
+                                    <div className="space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void handleAction(
+                                                    "generate"
+                                                )
+                                            }
+                                            disabled={
+                                                isSubmitting ||
+                                                isFetchingThumbnail ||
+                                                isAuthLoading
+                                            }
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <ZapIcon
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
 
-                                        {activeAction ===
-                                            "generate"
-                                            ? "Generating..."
-                                            : "Generate Thumbnail"}
-                                    </button>
+                                            {activeAction ===
+                                                "generate"
+                                                ? "Generating..."
+                                                : "Generate Thumbnail"}
+                                        </button>
+
+                                        <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-400">
+                                            {referenceImages.length > 0 ? (
+                                                <p>
+                                                    Generating with{" "}
+                                                    <span className="font-medium text-zinc-200">
+                                                        {referenceImages.length}{" "}
+                                                        reference image
+                                                        {referenceImages.length ===
+                                                            1
+                                                            ? ""
+                                                            : "s"}
+                                                    </span>
+                                                    . The first image will guide
+                                                    the main subject and visual
+                                                    direction.
+                                                </p>
+                                            ) : (
+                                                <p>
+                                                    No reference image selected.
+                                                    The thumbnail will be created
+                                                    entirely from your title,
+                                                    settings, and prompt.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
 
                                 {isEditMode && (
@@ -788,10 +889,10 @@ export default function GenerateWorkspace({
                                                     Premium Enhance:
                                                 </span>{" "}
                                                 Upload up to three reference
-                                                images. The first image will
-                                                guide the main composition,
-                                                while the others provide
-                                                supporting visual details.
+                                                images. The first image guides
+                                                the main composition, while
+                                                the others provide supporting
+                                                visual details.
                                             </p>
 
                                             <p>

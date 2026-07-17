@@ -107,10 +107,7 @@ const normalizeMimeType = (
             ?.trim()
             .toLowerCase();
 
-    if (
-        normalized ===
-        "image/jpg"
-    ) {
+    if (normalized === "image/jpg") {
         return "image/jpeg";
     }
 
@@ -195,6 +192,42 @@ const buildThumbnailPrompt = (
     return promptParts.join(" ");
 };
 
+const buildReferenceGenerationPrompt = (
+    data: GenerateThumbnailData,
+    referenceImageCount: number
+): string => {
+    const promptParts: string[] = [
+        buildThumbnailPrompt(data),
+
+        `You have been given ${referenceImageCount} reference image${referenceImageCount === 1
+            ? ""
+            : "s"
+        }.`,
+
+        "Use the first image as the primary visual reference.",
+
+        "Use any additional images only as supporting references for the person, face, hairstyle, clothing, product, object, background, lighting, colors, or visual details.",
+
+        "Create one unified professional thumbnail.",
+
+        "Do not create a collage, split screen, contact sheet, or multiple separate panels unless the creator instructions explicitly request one.",
+
+        "Do not duplicate people, faces, products, objects, or backgrounds simply because they appear in multiple references.",
+
+        "When a reference image contains a person, preserve that person's recognizable facial features, skin tone, hairstyle, approximate age, and overall identity.",
+
+        "Do not replace the referenced person with a different-looking person.",
+
+        "Keep the face natural, realistic, proportional, and clearly recognizable.",
+
+        "Correct malformed hands, extra fingers, duplicated limbs, distorted faces, partial objects, and visual artifacts.",
+
+        "Use the references as visual guidance while following the requested thumbnail title, style, colors, composition, and creator instructions.",
+    ];
+
+    return promptParts.join(" ");
+};
+
 const buildProEnhancementPrompt = (
     data: GenerateThumbnailData,
     referenceImageCount: number
@@ -214,6 +247,10 @@ const buildProEnhancementPrompt = (
         "Do not create a collage, split screen, contact sheet, or multiple separate panels unless the creator instructions explicitly request one.",
 
         "Do not duplicate people, faces, products, objects, backgrounds, or text simply because they appear across multiple references.",
+
+        "When a reference image contains a person, preserve that person's recognizable facial features, skin tone, hairstyle, approximate age, and overall identity.",
+
+        "Do not replace the referenced person with a different-looking person.",
 
         "Preserve the successful core concept, recognizable main subject, important objects, and overall visual direction of the primary reference.",
 
@@ -464,19 +501,11 @@ const validateSourceImageData = (
         );
     }
 
-    let imageBuffer: Buffer;
-
-    try {
-        imageBuffer =
-            Buffer.from(
-                sourceImage.data,
-                "base64"
-            );
-    } catch {
-        throw new Error(
-            "Reference image data is invalid"
+    const imageBuffer =
+        Buffer.from(
+            sourceImage.data,
+            "base64"
         );
-    }
 
     if (imageBuffer.length === 0) {
         throw new Error(
@@ -515,7 +544,7 @@ const resolveSourceImages = async (
 
     if (inputs.length === 0) {
         throw new Error(
-            "At least one reference image is required for Premium Enhance"
+            "At least one reference image is required"
         );
     }
 
@@ -553,8 +582,7 @@ const resolveSourceImages = async (
 const extractGeneratedImage = (
     response: Awaited<
         ReturnType<
-            typeof gemini.models
-            .generateContent
+            typeof gemini.models.generateContent
         >
     >,
 
@@ -621,8 +649,11 @@ const extractGeneratedImage = (
     }
 
     return {
-        buffer: imageBuffer,
+        buffer:
+            imageBuffer,
+
         promptUsed,
+
         modelUsed,
 
         mimeType:
@@ -638,16 +669,79 @@ export const generateThumbnailImage =
         data: GenerateThumbnailData,
 
         tier: ImageModelTier =
-            "flash"
+            "flash",
+
+        sourceInputs?:
+            | SourceImageInput
+            | SourceImageInput[]
     ): Promise<GeneratedThumbnailImage> => {
         const modelUsed =
             getImageModel(tier);
 
+        const hasReferenceImages =
+            sourceInputs !== undefined &&
+            (
+                Array.isArray(
+                    sourceInputs
+                )
+                    ? sourceInputs.length > 0
+                    : true
+            );
+
+        if (!hasReferenceImages) {
+            const promptUsed =
+                buildThumbnailPrompt(
+                    data
+                );
+
+            console.info(
+                `[Gemini Image] Generate using: ${modelUsed}`
+            );
+
+            console.info(
+                "[Gemini Image] Reference images: 0"
+            );
+
+            const response =
+                await gemini.models.generateContent(
+                    {
+                        model:
+                            modelUsed,
+
+                        contents:
+                            promptUsed,
+
+                        config:
+                            getGenerationConfig(
+                                data.aspect_ratio
+                            ),
+                    }
+                );
+
+            return extractGeneratedImage(
+                response,
+                promptUsed,
+                modelUsed
+            );
+        }
+
+        const sourceImages =
+            await resolveSourceImages(
+                sourceInputs
+            );
+
         const promptUsed =
-            buildThumbnailPrompt(data);
+            buildReferenceGenerationPrompt(
+                data,
+                sourceImages.length
+            );
 
         console.info(
             `[Gemini Image] Generate using: ${modelUsed}`
+        );
+
+        console.info(
+            `[Gemini Image] Reference images: ${sourceImages.length}`
         );
 
         const response =
@@ -656,8 +750,32 @@ export const generateThumbnailImage =
                     model:
                         modelUsed,
 
-                    contents:
-                        promptUsed,
+                    contents: [
+                        {
+                            role: "user",
+
+                            parts: [
+                                {
+                                    text:
+                                        promptUsed,
+                                },
+
+                                ...sourceImages.map(
+                                    (
+                                        sourceImage
+                                    ) => ({
+                                        inlineData: {
+                                            data:
+                                                sourceImage.data,
+
+                                            mimeType:
+                                                sourceImage.mimeType,
+                                        },
+                                    })
+                                ),
+                            ],
+                        },
+                    ],
 
                     config:
                         getGenerationConfig(
@@ -723,8 +841,7 @@ export const enhanceThumbnailWithPro =
                                     (
                                         sourceImage
                                     ) => ({
-                                        inlineData:
-                                        {
+                                        inlineData: {
                                             data:
                                                 sourceImage.data,
 
