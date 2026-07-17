@@ -46,10 +46,15 @@ export interface Thumbnail {
     color_scheme: ColorSchemeId;
 
     text_overlay: boolean;
+
     image_url?: string;
+    cloudinary_public_id?: string;
+
     prompt_used?: string;
     user_prompt?: string;
+
     isGenerating?: boolean;
+    generation_error?: string;
 
     createdAt?: string;
     updatedAt?: string;

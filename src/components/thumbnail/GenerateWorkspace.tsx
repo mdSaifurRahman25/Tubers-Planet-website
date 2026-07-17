@@ -14,9 +14,10 @@ import PreviewPanel from "@/components/thumbnail/PreviewPanel";
 import StyleSelector from "@/components/thumbnail/StyleSelector";
 import SoftBackdrop from "@/components/ui/SoftBackdrop";
 import { useAuth } from "@/context/AuthContext";
-import { colorSchemes } from "@/data/thumbnail-options";
+
 import type {
     AspectRatio,
+    ColorSchemeId,
     Thumbnail,
     ThumbnailStyle,
 } from "@/types/thumbnail.types";
@@ -44,10 +45,14 @@ const readApiResponse = async (
     }
 };
 
-const getErrorMessage = (error: unknown): string => {
-    return error instanceof Error
-        ? error.message
-        : "Something went wrong";
+const getErrorMessage = (
+    error: unknown
+): string => {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return "Something went wrong";
 };
 
 export default function GenerateWorkspace({
@@ -61,8 +66,11 @@ export default function GenerateWorkspace({
     } = useAuth();
 
     const [title, setTitle] = useState("");
-    const [additionalDetails, setAdditionalDetails] =
-        useState("");
+
+    const [
+        additionalDetails,
+        setAdditionalDetails,
+    ] = useState("");
 
     const [thumbnail, setThumbnail] =
         useState<Thumbnail | null>(null);
@@ -73,11 +81,15 @@ export default function GenerateWorkspace({
     const [aspectRatio, setAspectRatio] =
         useState<AspectRatio>("16:9");
 
-    const [colorSchemeId, setColorSchemeId] =
-        useState(colorSchemes[0]?.id ?? "");
+    const [
+        colorSchemeId,
+        setColorSchemeId,
+    ] = useState<ColorSchemeId>("vibrant");
 
     const [style, setStyle] =
-        useState<ThumbnailStyle>("Bold & Graphic");
+        useState<ThumbnailStyle>(
+            "Bold & Graphic"
+        );
 
     const [
         isStyleDropdownOpen,
@@ -111,9 +123,11 @@ export default function GenerateWorkspace({
                 {
                     method: "POST",
                     credentials: "include",
+
                     headers: {
                         "Content-Type": "application/json",
                     },
+
                     body: JSON.stringify({
                         title: title.trim(),
                         prompt: additionalDetails.trim(),
@@ -125,7 +139,8 @@ export default function GenerateWorkspace({
                 }
             );
 
-            const data = await readApiResponse(response);
+            const data =
+                await readApiResponse(response);
 
             if (
                 !response.ok ||
@@ -143,7 +158,7 @@ export default function GenerateWorkspace({
             router.push(
                 `/generate/${data.thumbnail._id}`
             );
-        } catch (error) {
+        } catch (error: unknown) {
             console.error(
                 "Thumbnail generation failed:",
                 error
@@ -209,19 +224,31 @@ export default function GenerateWorkspace({
                     data.thumbnail;
 
                 setThumbnail(currentThumbnail);
-                setTitle(currentThumbnail.title);
+
+                setTitle(
+                    currentThumbnail.title ?? ""
+                );
+
                 setAdditionalDetails(
                     currentThumbnail.user_prompt ?? ""
                 );
+
                 setColorSchemeId(
                     currentThumbnail.color_scheme
                 );
+
                 setAspectRatio(
                     currentThumbnail.aspect_ratio
                 );
-                setStyle(currentThumbnail.style);
+
+                setStyle(
+                    currentThumbnail.style
+                );
 
                 const isStillGenerating =
+                    Boolean(
+                        currentThumbnail.isGenerating
+                    ) ||
                     !currentThumbnail.image_url;
 
                 setIsLoading(isStillGenerating);
@@ -232,7 +259,7 @@ export default function GenerateWorkspace({
                         5000
                     );
                 }
-            } catch (error) {
+            } catch (error: unknown) {
                 if (!isActive) {
                     return;
                 }
@@ -242,12 +269,16 @@ export default function GenerateWorkspace({
                     error
                 );
 
-                toast.error(getErrorMessage(error));
+                toast.error(
+                    getErrorMessage(error)
+                );
+
                 setIsLoading(false);
             }
         };
 
         setIsLoading(true);
+
         void fetchThumbnail();
 
         return () => {
@@ -272,7 +303,9 @@ export default function GenerateWorkspace({
     const handleDetailsChange = (
         event: ChangeEvent<HTMLTextAreaElement>
     ) => {
-        setAdditionalDetails(event.target.value);
+        setAdditionalDetails(
+            event.target.value
+        );
     };
 
     return (
@@ -303,11 +336,11 @@ export default function GenerateWorkspace({
                                     </p>
                                 </div>
 
-                                {/* Title */}
+                                {/* Title input */}
                                 <div className="space-y-2">
                                     <label
                                         htmlFor="thumbnail-title"
-                                        className="block text-sm font-medium"
+                                        className="block text-sm font-medium text-zinc-200"
                                     >
                                         Title &amp; Topic
                                     </label>
@@ -337,7 +370,9 @@ export default function GenerateWorkspace({
                                 <StyleSelector
                                     value={style}
                                     onChange={setStyle}
-                                    isOpen={isStyleDropdownOpen}
+                                    isOpen={
+                                        isStyleDropdownOpen
+                                    }
                                     setIsOpen={
                                         setIsStyleDropdownOpen
                                     }
@@ -345,14 +380,16 @@ export default function GenerateWorkspace({
 
                                 <ColorSchemeSelector
                                     value={colorSchemeId}
-                                    onChange={setColorSchemeId}
+                                    onChange={
+                                        setColorSchemeId
+                                    }
                                 />
 
                                 {/* Additional prompt */}
                                 <div className="space-y-2">
                                     <label
                                         htmlFor="additional-details"
-                                        className="block text-sm font-medium"
+                                        className="block text-sm font-medium text-zinc-200"
                                     >
                                         Additional Prompts{" "}
                                         <span className="text-xs text-zinc-400">
@@ -363,7 +400,9 @@ export default function GenerateWorkspace({
                                     <textarea
                                         id="additional-details"
                                         value={additionalDetails}
-                                        onChange={handleDetailsChange}
+                                        onChange={
+                                            handleDetailsChange
+                                        }
                                         rows={3}
                                         placeholder="Add any specific elements, mood, or style preferences..."
                                         className="w-full resize-none rounded-lg border border-white/10 bg-white/6 px-4 py-3 text-zinc-100 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-500"
@@ -373,9 +412,12 @@ export default function GenerateWorkspace({
                                 {!thumbnailId && (
                                     <button
                                         type="button"
-                                        onClick={handleGenerate}
+                                        onClick={
+                                            handleGenerate
+                                        }
                                         disabled={
-                                            isLoading || isAuthLoading
+                                            isLoading ||
+                                            isAuthLoading
                                         }
                                         className="w-full rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition-colors hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
