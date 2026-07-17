@@ -15,6 +15,7 @@ import {
 import type {
     AspectRatio,
     ColorSchemeId,
+    ThumbnailGenerationMode,
     ThumbnailStyle,
 } from "@/types/thumbnail.types";
 
@@ -37,6 +38,9 @@ export interface IThumbnail {
 
     isGenerating: boolean;
     generation_error?: string;
+
+    model_used?: string;
+    generation_mode?: ThumbnailGenerationMode;
 
     createdAt?: Date;
     updatedAt?: Date;
@@ -129,7 +133,7 @@ const ThumbnailSchema = new Schema<IThumbnail>(
             trim: true,
             default: "",
             maxlength: [
-                5000,
+                6000,
                 "Generated prompt is too long",
             ],
         },
@@ -157,6 +161,22 @@ const ThumbnailSchema = new Schema<IThumbnail>(
                 1000,
                 "Generation error cannot exceed 1000 characters",
             ],
+        },
+
+        model_used: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        generation_mode: {
+            type: String,
+            enum: [
+                "flash_generate",
+                "flash_regenerate",
+                "pro_enhance",
+            ],
+            default: "flash_generate",
         },
     },
     {

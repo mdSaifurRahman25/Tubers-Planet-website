@@ -21,23 +21,21 @@ const getErrorMessage = (
     return "Unable to generate thumbnail";
 };
 
-const getErrorStatus = (
+const isUnauthorizedMessage = (
     message: string
-): number => {
-    const normalizedMessage =
+): boolean => {
+    const normalized =
         message.toLowerCase();
 
-    if (
-        normalizedMessage.includes("unauthorized") ||
-        normalizedMessage.includes("login")
-    ) {
-        return 401;
-    }
-
-    return 500;
+    return (
+        normalized.includes("unauthorized") ||
+        normalized.includes("login")
+    );
 };
 
-export async function POST(request: Request) {
+export async function POST(
+    request: Request
+) {
     let thumbnailId: string | null = null;
 
     try {
@@ -75,12 +73,18 @@ export async function POST(request: Request) {
                 prompt_used: "",
 
                 image_url: "",
-
                 cloudinary_public_id: "",
 
                 isGenerating: true,
-
                 generation_error: "",
+
+                model_used:
+                    process.env
+                        .GEMINI_FLASH_IMAGE_MODEL ||
+                    "gemini-3.1-flash-image",
+
+                generation_mode:
+                    "flash_generate",
             });
 
         thumbnailId =
@@ -88,7 +92,8 @@ export async function POST(request: Request) {
 
         const generatedImage =
             await generateThumbnailImage(
-                input
+                input,
+                "flash"
             );
 
         const uploadedImage =
@@ -106,8 +111,13 @@ export async function POST(request: Request) {
         thumbnail.prompt_used =
             generatedImage.promptUsed;
 
-        thumbnail.isGenerating = false;
+        thumbnail.model_used =
+            generatedImage.modelUsed;
 
+        thumbnail.generation_mode =
+            "flash_generate";
+
+        thumbnail.isGenerating = false;
         thumbnail.generation_error = "";
 
         await thumbnail.save();
@@ -116,7 +126,7 @@ export async function POST(request: Request) {
             {
                 success: true,
                 message:
-                    "Thumbnail generated successfully",
+                    "Thumbnail generated with Flash successfully",
                 thumbnail,
             },
             {
@@ -125,7 +135,7 @@ export async function POST(request: Request) {
         );
     } catch (error: unknown) {
         console.error(
-            "Thumbnail generation failed:",
+            "Flash thumbnail generation failed:",
             error
         );
 
@@ -143,9 +153,9 @@ export async function POST(request: Request) {
                         },
                     }
                 );
-            } catch (updateError: unknown) {
+            } catch (updateError) {
                 console.error(
-                    "Unable to update failed thumbnail:",
+                    "Failed thumbnail status update failed:",
                     updateError
                 );
             }
@@ -189,7 +199,9 @@ export async function POST(request: Request) {
             },
             {
                 status:
-                    getErrorStatus(message),
+                    isUnauthorizedMessage(message)
+                        ? 401
+                        : 500,
             }
         );
     }

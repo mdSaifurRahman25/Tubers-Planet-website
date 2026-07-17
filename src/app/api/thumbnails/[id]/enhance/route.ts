@@ -11,14 +11,14 @@ import {
 } from "@/lib/cloudinary/upload-image";
 
 import connectDatabase from "@/lib/db/connect-db";
-import { generateThumbnailImage } from "@/lib/services/generate-thumbnail-image";
+import { enhanceThumbnailWithPro } from "@/lib/services/generate-thumbnail-image";
 import { generateThumbnailSchema } from "@/lib/validations/thumbnail.schema";
 import Thumbnail from "@/models/Thumbnail";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
-interface RegenerateRouteContext {
+interface EnhanceRouteContext {
     params: Promise<{
         id: string;
     }>;
@@ -31,7 +31,7 @@ const getErrorMessage = (
         return error.message;
     }
 
-    return "Unable to regenerate thumbnail";
+    return "Unable to enhance thumbnail";
 };
 
 const isUnauthorizedMessage = (
@@ -48,7 +48,7 @@ const isUnauthorizedMessage = (
 
 export async function POST(
     request: Request,
-    { params }: RegenerateRouteContext
+    { params }: EnhanceRouteContext
 ) {
     let uploadedImage:
         | UploadedImage
@@ -96,10 +96,23 @@ export async function POST(
                 {
                     success: false,
                     message:
-                        "Thumbnail not found or you do not have permission to edit it",
+                        "Thumbnail not found or you do not have permission to enhance it",
                 },
                 {
                     status: 404,
+                }
+            );
+        }
+
+        if (!thumbnail.image_url) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        "Generate a Flash thumbnail before using Pro Enhance",
+                },
+                {
+                    status: 400,
                 }
             );
         }
@@ -120,6 +133,9 @@ export async function POST(
         activeThumbnailId =
             thumbnail._id.toString();
 
+        const oldImageUrl =
+            thumbnail.image_url;
+
         const oldCloudinaryPublicId =
             thumbnail.cloudinary_public_id;
 
@@ -129,9 +145,9 @@ export async function POST(
         await thumbnail.save();
 
         const generatedImage =
-            await generateThumbnailImage(
+            await enhanceThumbnailWithPro(
                 input,
-                "flash"
+                oldImageUrl
             );
 
         uploadedImage =
@@ -168,7 +184,7 @@ export async function POST(
             generatedImage.modelUsed;
 
         thumbnail.generation_mode =
-            "flash_regenerate";
+            "pro_enhance";
 
         thumbnail.isGenerating = false;
         thumbnail.generation_error = "";
@@ -200,7 +216,7 @@ export async function POST(
             {
                 success: true,
                 message:
-                    "Thumbnail regenerated with Flash successfully",
+                    "Thumbnail enhanced with Gemini Pro successfully",
                 thumbnail,
             },
             {
@@ -209,7 +225,7 @@ export async function POST(
         );
     } catch (error: unknown) {
         console.error(
-            "Flash regeneration failed:",
+            "Pro enhancement failed:",
             error
         );
 
@@ -224,7 +240,7 @@ export async function POST(
                 );
             } catch (cleanupError) {
                 console.error(
-                    "Uploaded image cleanup failed:",
+                    "Pro image cleanup failed:",
                     cleanupError
                 );
             }
@@ -246,7 +262,7 @@ export async function POST(
                 );
             } catch (updateError) {
                 console.error(
-                    "Failure status update failed:",
+                    "Enhancement failure status update failed:",
                     updateError
                 );
             }

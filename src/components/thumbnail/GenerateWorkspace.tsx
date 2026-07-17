@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import {
     useEffect,
     useState,
     type ChangeEvent,
 } from "react";
+
+import {
+    SparklesIcon,
+    ZapIcon,
+} from "lucide-react";
+
 import toast from "react-hot-toast";
 
 import AspectRatioSelector from "@/components/thumbnail/AspectRatioSelector";
@@ -33,6 +40,16 @@ interface ThumbnailApiResponse {
     thumbnail?: Thumbnail;
 }
 
+type ThumbnailAction =
+    | "generate"
+    | "regenerate"
+    | "enhance";
+
+interface GenerationStatus {
+    label: string;
+    className: string;
+}
+
 const readApiResponse = async (
     response: Response
 ): Promise<ThumbnailApiResponse> => {
@@ -41,7 +58,8 @@ const readApiResponse = async (
     } catch {
         return {
             success: false,
-            message: "Invalid response from the server",
+            message:
+                "Invalid response from the server",
         };
     }
 };
@@ -56,6 +74,67 @@ const getErrorMessage = (
     return "Something went wrong";
 };
 
+const getGenerationStatus = (
+    thumbnail: Thumbnail | null
+): GenerationStatus | null => {
+    if (!thumbnail?.image_url) {
+        return null;
+    }
+
+    if (
+        thumbnail.generation_mode ===
+        "pro_enhance"
+    ) {
+        return {
+            label: "Premium Enhanced",
+            className:
+                "border-amber-400/30 bg-amber-400/10 text-amber-300",
+        };
+    }
+
+    if (
+        thumbnail.generation_mode ===
+        "flash_regenerate"
+    ) {
+        return {
+            label: "Regenerated",
+            className:
+                "border-sky-400/30 bg-sky-400/10 text-sky-300",
+        };
+    }
+
+    if (
+        thumbnail.generation_mode ===
+        "flash_generate"
+    ) {
+        return {
+            label: "First Generation",
+            className:
+                "border-pink-400/30 bg-pink-400/10 text-pink-300",
+        };
+    }
+
+    return {
+        label: "Generated",
+        className:
+            "border-white/15 bg-white/8 text-zinc-300",
+    };
+};
+
+const getSuccessMessage = (
+    action: ThumbnailAction
+): string => {
+    if (action === "regenerate") {
+        return "Thumbnail regenerated successfully";
+    }
+
+    if (action === "enhance") {
+        return "Premium enhancement completed successfully";
+    }
+
+    return "Thumbnail generated successfully";
+};
+
 export default function GenerateWorkspace({
     thumbnailId,
 }: GenerateWorkspaceProps) {
@@ -66,9 +145,11 @@ export default function GenerateWorkspace({
         isAuthLoading,
     } = useAuth();
 
-    const isEditMode = Boolean(thumbnailId);
+    const isEditMode =
+        Boolean(thumbnailId);
 
-    const [title, setTitle] = useState("");
+    const [title, setTitle] =
+        useState("");
 
     const [
         additionalDetails,
@@ -84,9 +165,11 @@ export default function GenerateWorkspace({
     ] = useState(Boolean(thumbnailId));
 
     const [
-        isSubmitting,
-        setIsSubmitting,
-    ] = useState(false);
+        activeAction,
+        setActiveAction,
+    ] = useState<ThumbnailAction | null>(
+        null
+    );
 
     const [aspectRatio, setAspectRatio] =
         useState<AspectRatio>("16:9");
@@ -94,7 +177,9 @@ export default function GenerateWorkspace({
     const [
         colorSchemeId,
         setColorSchemeId,
-    ] = useState<ColorSchemeId>("vibrant");
+    ] = useState<ColorSchemeId>(
+        "vibrant"
+    );
 
     const [style, setStyle] =
         useState<ThumbnailStyle>(
@@ -105,6 +190,9 @@ export default function GenerateWorkspace({
         isStyleDropdownOpen,
         setIsStyleDropdownOpen,
     ] = useState(false);
+
+    const isSubmitting =
+        activeAction !== null;
 
     const applyThumbnailToForm = (
         currentThumbnail: Thumbnail
@@ -127,7 +215,9 @@ export default function GenerateWorkspace({
             currentThumbnail.color_scheme
         );
 
-        setStyle(currentThumbnail.style);
+        setStyle(
+            currentThumbnail.style
+        );
     };
 
     useEffect(() => {
@@ -192,7 +282,9 @@ export default function GenerateWorkspace({
 
                 setIsFetchingThumbnail(false);
 
-                if (data.thumbnail.isGenerating) {
+                if (
+                    data.thumbnail.isGenerating
+                ) {
                     pollingTimer = setTimeout(
                         fetchThumbnail,
                         5000
@@ -234,7 +326,9 @@ export default function GenerateWorkspace({
         router,
     ]);
 
-    const handleSubmit = async () => {
+    const handleAction = async (
+        action: ThumbnailAction
+    ) => {
         if (
             isSubmitting ||
             isFetchingThumbnail ||
@@ -257,12 +351,37 @@ export default function GenerateWorkspace({
             return;
         }
 
-        const endpoint =
-            thumbnailId
-                ? `/api/thumbnails/${thumbnailId}/regenerate`
-                : "/api/thumbnails/generate";
+        if (
+            action === "enhance" &&
+            !thumbnail?.image_url
+        ) {
+            toast.error(
+                "Generate a thumbnail before using Premium Enhance"
+            );
 
-        setIsSubmitting(true);
+            return;
+        }
+
+        let endpoint =
+            "/api/thumbnails/generate";
+
+        if (
+            action === "regenerate" &&
+            thumbnailId
+        ) {
+            endpoint =
+                `/api/thumbnails/${thumbnailId}/regenerate`;
+        }
+
+        if (
+            action === "enhance" &&
+            thumbnailId
+        ) {
+            endpoint =
+                `/api/thumbnails/${thumbnailId}/enhance`;
+        }
+
+        setActiveAction(action);
 
         try {
             const response = await fetch(
@@ -305,7 +424,7 @@ export default function GenerateWorkspace({
             ) {
                 throw new Error(
                     data.message ||
-                    "Unable to generate thumbnail"
+                    "Unable to process thumbnail"
                 );
             }
 
@@ -313,9 +432,11 @@ export default function GenerateWorkspace({
                 data.thumbnail
             );
 
-            toast.success(data.message);
+            toast.success(
+                getSuccessMessage(action)
+            );
 
-            if (!thumbnailId) {
+            if (action === "generate") {
                 router.push(
                     `/generate/${data.thumbnail._id}`
                 );
@@ -324,9 +445,7 @@ export default function GenerateWorkspace({
             }
         } catch (error: unknown) {
             console.error(
-                isEditMode
-                    ? "Thumbnail regeneration failed:"
-                    : "Thumbnail generation failed:",
+                `${action} thumbnail failed:`,
                 error
             );
 
@@ -334,7 +453,7 @@ export default function GenerateWorkspace({
                 getErrorMessage(error)
             );
         } finally {
-            setIsSubmitting(false);
+            setActiveAction(null);
         }
     };
 
@@ -357,6 +476,9 @@ export default function GenerateWorkspace({
         isSubmitting ||
         Boolean(thumbnail?.isGenerating);
 
+    const generationStatus =
+        getGenerationStatus(thumbnail);
+
     return (
         <>
             <SoftBackdrop />
@@ -364,7 +486,6 @@ export default function GenerateWorkspace({
             <div className="relative z-10 min-h-screen pt-24">
                 <main className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:pb-8">
                     <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
-                        {/* Left panel */}
                         <div className="space-y-4">
                             <fieldset
                                 disabled={
@@ -382,12 +503,11 @@ export default function GenerateWorkspace({
 
                                     <p className="text-sm text-zinc-400">
                                         {isEditMode
-                                            ? "Update the details and regenerate a new version"
-                                            : "Describe your vision and let AI bring it to life"}
+                                            ? "Update the details, create a fresh version, or polish the current result."
+                                            : "Describe your vision and generate a professional thumbnail."}
                                     </p>
                                 </div>
 
-                                {/* Title */}
                                 <div className="space-y-2">
                                     <label
                                         htmlFor="thumbnail-title"
@@ -400,7 +520,9 @@ export default function GenerateWorkspace({
                                         id="thumbnail-title"
                                         type="text"
                                         value={title}
-                                        onChange={handleTitleChange}
+                                        onChange={
+                                            handleTitleChange
+                                        }
                                         maxLength={100}
                                         placeholder="e.g., 10 Tips for Better Sleep"
                                         className="w-full rounded-lg border border-white/12 bg-black/20 px-4 py-3 text-zinc-100 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-500"
@@ -436,7 +558,6 @@ export default function GenerateWorkspace({
                                     }
                                 />
 
-                                {/* Additional prompt */}
                                 <div className="space-y-2">
                                     <label
                                         htmlFor="additional-details"
@@ -450,34 +571,122 @@ export default function GenerateWorkspace({
 
                                     <textarea
                                         id="additional-details"
-                                        value={additionalDetails}
+                                        value={
+                                            additionalDetails
+                                        }
                                         onChange={
                                             handleDetailsChange
                                         }
-                                        rows={5}
-                                        placeholder="Add any specific elements, mood, or style preferences..."
+                                        rows={6}
+                                        placeholder="Add correction instructions, specific elements, mood, layout or text requirements..."
                                         className="w-full resize-none rounded-lg border border-white/10 bg-white/6 px-4 py-3 text-zinc-100 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-500"
                                     />
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={handleSubmit}
-                                    disabled={
-                                        isSubmitting ||
-                                        isFetchingThumbnail ||
-                                        isAuthLoading
-                                    }
-                                    className="w-full rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isSubmitting
-                                        ? isEditMode
-                                            ? "Regenerating..."
-                                            : "Generating..."
-                                        : isEditMode
-                                            ? "Regenerate Thumbnail"
+                                {!isEditMode && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            void handleAction(
+                                                "generate"
+                                            )
+                                        }
+                                        disabled={
+                                            isSubmitting ||
+                                            isFetchingThumbnail ||
+                                            isAuthLoading
+                                        }
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <ZapIcon
+                                            aria-hidden="true"
+                                            className="size-4"
+                                        />
+
+                                        {activeAction ===
+                                            "generate"
+                                            ? "Generating..."
                                             : "Generate Thumbnail"}
-                                </button>
+                                    </button>
+                                )}
+
+                                {isEditMode && (
+                                    <div className="space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void handleAction(
+                                                    "regenerate"
+                                                )
+                                            }
+                                            disabled={
+                                                isSubmitting ||
+                                                isFetchingThumbnail ||
+                                                isAuthLoading
+                                            }
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <ZapIcon
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
+
+                                            {activeAction ===
+                                                "regenerate"
+                                                ? "Regenerating..."
+                                                : "Regenerate Thumbnail"}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void handleAction(
+                                                    "enhance"
+                                                )
+                                            }
+                                            disabled={
+                                                isSubmitting ||
+                                                isFetchingThumbnail ||
+                                                isAuthLoading ||
+                                                !thumbnail?.image_url
+                                            }
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-amber-300 to-yellow-500 py-3.5 text-[15px] font-semibold text-zinc-950 transition hover:from-amber-200 hover:to-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <SparklesIcon
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
+
+                                            {activeAction ===
+                                                "enhance"
+                                                ? "Enhancing..."
+                                                : "Premium Enhance"}
+                                        </button>
+
+                                        <div className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-400">
+                                            <p>
+                                                <span className="font-medium text-zinc-200">
+                                                    Regenerate:
+                                                </span>{" "}
+                                                Use this when you want a
+                                                fresh image based on your
+                                                updated title, prompt,
+                                                style, color, or layout.
+                                            </p>
+
+                                            <p>
+                                                <span className="font-medium text-amber-300">
+                                                    Premium Enhance:
+                                                </span>{" "}
+                                                Use this when you like the
+                                                current concept and want a
+                                                more polished final version
+                                                while preserving its main
+                                                visual direction.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </fieldset>
 
                             {isEditMode && (
@@ -490,12 +699,21 @@ export default function GenerateWorkspace({
                             )}
                         </div>
 
-                        {/* Right panel */}
                         <div>
                             <div className="rounded-2xl border border-white/10 bg-white/8 p-6 shadow-xl">
-                                <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-                                    Preview
-                                </h2>
+                                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                                    <h2 className="text-lg font-semibold text-zinc-100">
+                                        Preview
+                                    </h2>
+
+                                    {generationStatus && (
+                                        <span
+                                            className={`rounded-full border px-3 py-1 text-xs ${generationStatus.className}`}
+                                        >
+                                            {generationStatus.label}
+                                        </span>
+                                    )}
+                                </div>
 
                                 <PreviewPanel
                                     thumbnail={thumbnail}

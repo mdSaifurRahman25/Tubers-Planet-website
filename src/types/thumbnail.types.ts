@@ -20,6 +20,11 @@ export type ColorSchemeId =
     | "neon"
     | "pastel";
 
+export type ThumbnailGenerationMode =
+    | "flash_generate"
+    | "flash_regenerate"
+    | "pro_enhance";
+
 export interface ColorScheme {
     id: ColorSchemeId;
     name: string;
@@ -55,6 +60,9 @@ export interface Thumbnail {
 
     isGenerating?: boolean;
     generation_error?: string;
+
+    model_used?: string;
+    generation_mode?: ThumbnailGenerationMode;
 
     createdAt?: string;
     updatedAt?: string;

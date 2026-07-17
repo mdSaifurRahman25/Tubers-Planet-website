@@ -98,3 +98,12 @@ src/
     ├── User.ts
     ├── Thumbnail.ts
     └── Session.ts
+
+    CREATE
+src/components/thumbnail/ReferenceImageUploader.tsx
+src/lib/images/read-reference-image.ts
+
+UPDATE
+src/components/thumbnail/GenerateWorkspace.tsx
+src/app/api/thumbnails/[id]/enhance/route.ts
+src/lib/services/generate-thumbnail-image.ts
