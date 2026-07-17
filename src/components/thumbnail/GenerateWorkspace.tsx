@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
     useEffect,
     useState,
     type ChangeEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import AspectRatioSelector from "@/components/thumbnail/AspectRatioSelector";
@@ -65,6 +66,8 @@ export default function GenerateWorkspace({
         isAuthLoading,
     } = useAuth();
 
+    const isEditMode = Boolean(thumbnailId);
+
     const [title, setTitle] = useState("");
 
     const [
@@ -75,8 +78,15 @@ export default function GenerateWorkspace({
     const [thumbnail, setThumbnail] =
         useState<Thumbnail | null>(null);
 
-    const [isLoading, setIsLoading] =
-        useState(Boolean(thumbnailId));
+    const [
+        isFetchingThumbnail,
+        setIsFetchingThumbnail,
+    ] = useState(Boolean(thumbnailId));
+
+    const [
+        isSubmitting,
+        setIsSubmitting,
+    ] = useState(false);
 
     const [aspectRatio, setAspectRatio] =
         useState<AspectRatio>("16:9");
@@ -96,83 +106,34 @@ export default function GenerateWorkspace({
         setIsStyleDropdownOpen,
     ] = useState(false);
 
-    const handleGenerate = async () => {
-        if (isAuthLoading || isLoading) {
-            return;
-        }
+    const applyThumbnailToForm = (
+        currentThumbnail: Thumbnail
+    ) => {
+        setThumbnail(currentThumbnail);
 
-        if (!isLoggedIn) {
-            toast.error(
-                "Please log in to generate thumbnails"
-            );
+        setTitle(
+            currentThumbnail.title ?? ""
+        );
 
-            router.push("/login");
-            return;
-        }
+        setAdditionalDetails(
+            currentThumbnail.user_prompt ?? ""
+        );
 
-        if (!title.trim()) {
-            toast.error("Title is required");
-            return;
-        }
+        setAspectRatio(
+            currentThumbnail.aspect_ratio
+        );
 
-        setIsLoading(true);
+        setColorSchemeId(
+            currentThumbnail.color_scheme
+        );
 
-        try {
-            const response = await fetch(
-                "/api/thumbnails/generate",
-                {
-                    method: "POST",
-                    credentials: "include",
-
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-
-                    body: JSON.stringify({
-                        title: title.trim(),
-                        prompt: additionalDetails.trim(),
-                        style,
-                        aspect_ratio: aspectRatio,
-                        color_scheme: colorSchemeId,
-                        text_overlay: true,
-                    }),
-                }
-            );
-
-            const data =
-                await readApiResponse(response);
-
-            if (
-                !response.ok ||
-                !data.success ||
-                !data.thumbnail
-            ) {
-                throw new Error(
-                    data.message ||
-                    "Unable to generate thumbnail"
-                );
-            }
-
-            toast.success(data.message);
-
-            router.push(
-                `/generate/${data.thumbnail._id}`
-            );
-        } catch (error: unknown) {
-            console.error(
-                "Thumbnail generation failed:",
-                error
-            );
-
-            toast.error(getErrorMessage(error));
-            setIsLoading(false);
-        }
+        setStyle(currentThumbnail.style);
     };
 
     useEffect(() => {
         if (!thumbnailId) {
             setThumbnail(null);
-            setIsLoading(false);
+            setIsFetchingThumbnail(false);
             return;
         }
 
@@ -181,13 +142,18 @@ export default function GenerateWorkspace({
         }
 
         if (!isLoggedIn) {
-            setIsLoading(false);
+            setIsFetchingThumbnail(false);
+
+            router.replace(
+                `/login?next=/generate/${thumbnailId}`
+            );
+
             return;
         }
 
         let isActive = true;
 
-        let pollingTimeout:
+        let pollingTimer:
             | ReturnType<typeof setTimeout>
             | undefined;
 
@@ -212,7 +178,7 @@ export default function GenerateWorkspace({
                 ) {
                     throw new Error(
                         data.message ||
-                        "Unable to load thumbnail"
+                        "Unable to fetch thumbnail"
                     );
                 }
 
@@ -220,41 +186,14 @@ export default function GenerateWorkspace({
                     return;
                 }
 
-                const currentThumbnail =
-                    data.thumbnail;
-
-                setThumbnail(currentThumbnail);
-
-                setTitle(
-                    currentThumbnail.title ?? ""
+                applyThumbnailToForm(
+                    data.thumbnail
                 );
 
-                setAdditionalDetails(
-                    currentThumbnail.user_prompt ?? ""
-                );
+                setIsFetchingThumbnail(false);
 
-                setColorSchemeId(
-                    currentThumbnail.color_scheme
-                );
-
-                setAspectRatio(
-                    currentThumbnail.aspect_ratio
-                );
-
-                setStyle(
-                    currentThumbnail.style
-                );
-
-                const isStillGenerating =
-                    Boolean(
-                        currentThumbnail.isGenerating
-                    ) ||
-                    !currentThumbnail.image_url;
-
-                setIsLoading(isStillGenerating);
-
-                if (isStillGenerating) {
-                    pollingTimeout = setTimeout(
+                if (data.thumbnail.isGenerating) {
+                    pollingTimer = setTimeout(
                         fetchThumbnail,
                         5000
                     );
@@ -273,26 +212,131 @@ export default function GenerateWorkspace({
                     getErrorMessage(error)
                 );
 
-                setIsLoading(false);
+                setIsFetchingThumbnail(false);
             }
         };
 
-        setIsLoading(true);
+        setIsFetchingThumbnail(true);
 
         void fetchThumbnail();
 
         return () => {
             isActive = false;
 
-            if (pollingTimeout) {
-                clearTimeout(pollingTimeout);
+            if (pollingTimer) {
+                clearTimeout(pollingTimer);
             }
         };
     }, [
         thumbnailId,
         isAuthLoading,
         isLoggedIn,
+        router,
     ]);
+
+    const handleSubmit = async () => {
+        if (
+            isSubmitting ||
+            isFetchingThumbnail ||
+            isAuthLoading
+        ) {
+            return;
+        }
+
+        if (!isLoggedIn) {
+            toast.error(
+                "Please log in to generate thumbnails"
+            );
+
+            router.push("/login");
+            return;
+        }
+
+        if (!title.trim()) {
+            toast.error("Title is required");
+            return;
+        }
+
+        const endpoint =
+            thumbnailId
+                ? `/api/thumbnails/${thumbnailId}/regenerate`
+                : "/api/thumbnails/generate";
+
+        setIsSubmitting(true);
+
+        try {
+            const response = await fetch(
+                endpoint,
+                {
+                    method: "POST",
+                    credentials: "include",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+
+                    body: JSON.stringify({
+                        title: title.trim(),
+
+                        prompt:
+                            additionalDetails.trim(),
+
+                        style,
+
+                        aspect_ratio:
+                            aspectRatio,
+
+                        color_scheme:
+                            colorSchemeId,
+
+                        text_overlay: true,
+                    }),
+                }
+            );
+
+            const data =
+                await readApiResponse(response);
+
+            if (
+                !response.ok ||
+                !data.success ||
+                !data.thumbnail
+            ) {
+                throw new Error(
+                    data.message ||
+                    "Unable to generate thumbnail"
+                );
+            }
+
+            applyThumbnailToForm(
+                data.thumbnail
+            );
+
+            toast.success(data.message);
+
+            if (!thumbnailId) {
+                router.push(
+                    `/generate/${data.thumbnail._id}`
+                );
+            } else {
+                router.refresh();
+            }
+        } catch (error: unknown) {
+            console.error(
+                isEditMode
+                    ? "Thumbnail regeneration failed:"
+                    : "Thumbnail generation failed:",
+                error
+            );
+
+            toast.error(
+                getErrorMessage(error)
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const handleTitleChange = (
         event: ChangeEvent<HTMLInputElement>
@@ -308,6 +352,11 @@ export default function GenerateWorkspace({
         );
     };
 
+    const isPreviewLoading =
+        isFetchingThumbnail ||
+        isSubmitting ||
+        Boolean(thumbnail?.isGenerating);
+
     return (
         <>
             <SoftBackdrop />
@@ -316,27 +365,29 @@ export default function GenerateWorkspace({
                 <main className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:pb-8">
                     <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
                         {/* Left panel */}
-                        <fieldset
-                            disabled={Boolean(thumbnailId)}
-                            className={
-                                thumbnailId
-                                    ? "space-y-6 opacity-80"
-                                    : "space-y-6"
-                            }
-                        >
-                            <div className="space-y-6 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-xl">
+                        <div className="space-y-4">
+                            <fieldset
+                                disabled={
+                                    isFetchingThumbnail ||
+                                    isSubmitting
+                                }
+                                className="space-y-6 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-xl disabled:opacity-70"
+                            >
                                 <div>
                                     <h1 className="mb-1 text-xl font-bold text-zinc-100">
-                                        Create Your Thumbnail
+                                        {isEditMode
+                                            ? "Edit Your Thumbnail"
+                                            : "Create Your Thumbnail"}
                                     </h1>
 
                                     <p className="text-sm text-zinc-400">
-                                        Describe your vision and let AI
-                                        bring it to life
+                                        {isEditMode
+                                            ? "Update the details and regenerate a new version"
+                                            : "Describe your vision and let AI bring it to life"}
                                     </p>
                                 </div>
 
-                                {/* Title input */}
+                                {/* Title */}
                                 <div className="space-y-2">
                                     <label
                                         htmlFor="thumbnail-title"
@@ -403,31 +454,41 @@ export default function GenerateWorkspace({
                                         onChange={
                                             handleDetailsChange
                                         }
-                                        rows={3}
+                                        rows={5}
                                         placeholder="Add any specific elements, mood, or style preferences..."
                                         className="w-full resize-none rounded-lg border border-white/10 bg-white/6 px-4 py-3 text-zinc-100 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-500"
                                     />
                                 </div>
 
-                                {!thumbnailId && (
-                                    <button
-                                        type="button"
-                                        onClick={
-                                            handleGenerate
-                                        }
-                                        disabled={
-                                            isLoading ||
-                                            isAuthLoading
-                                        }
-                                        className="w-full rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition-colors hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {isLoading
-                                            ? "Generating..."
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={
+                                        isSubmitting ||
+                                        isFetchingThumbnail ||
+                                        isAuthLoading
+                                    }
+                                    className="w-full rounded-xl bg-linear-to-b from-pink-500 to-pink-600 py-3.5 text-[15px] font-medium text-white transition hover:from-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isSubmitting
+                                        ? isEditMode
+                                            ? "Regenerating..."
+                                            : "Generating..."
+                                        : isEditMode
+                                            ? "Regenerate Thumbnail"
                                             : "Generate Thumbnail"}
-                                    </button>
-                                )}
-                            </div>
-                        </fieldset>
+                                </button>
+                            </fieldset>
+
+                            {isEditMode && (
+                                <Link
+                                    href="/generate"
+                                    className="flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                                >
+                                    Create a New Thumbnail
+                                </Link>
+                            )}
+                        </div>
 
                         {/* Right panel */}
                         <div>
@@ -438,8 +499,12 @@ export default function GenerateWorkspace({
 
                                 <PreviewPanel
                                     thumbnail={thumbnail}
-                                    isLoading={isLoading}
-                                    aspectRatio={aspectRatio}
+                                    isLoading={
+                                        isPreviewLoading
+                                    }
+                                    aspectRatio={
+                                        aspectRatio
+                                    }
                                 />
                             </div>
                         </div>

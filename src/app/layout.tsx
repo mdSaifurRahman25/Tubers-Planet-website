@@ -11,19 +11,28 @@ export const metadata: Metadata = {
     default: "Thumblify",
     template: "%s | Thumblify",
   },
+
   description:
-    "Create professional YouTube thumbnails with AI.",
+    "Create professional YouTube thumbnails using artificial intelligence.",
 };
+
+interface RootLayoutProps {
+  children: ReactNode;
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
+}: Readonly<RootLayoutProps>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body className="min-h-screen bg-black text-white antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

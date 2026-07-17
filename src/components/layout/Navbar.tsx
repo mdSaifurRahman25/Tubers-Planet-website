@@ -1,25 +1,75 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import {
+    MenuIcon,
+    XIcon,
+} from "lucide-react";
 import {
     useEffect,
     useState,
 } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import {
-    usePathname,
-    useRouter,
-} from "next/navigation";
 import {
     AnimatePresence,
     motion,
 } from "motion/react";
 import {
-    MenuIcon,
-    XIcon,
-} from "lucide-react";
+    usePathname,
+    useRouter,
+} from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
+
+interface NavigationItem {
+    label: string;
+    href: string;
+    protected?: boolean;
+    guestOnly?: boolean;
+}
+
+const navigationItems: NavigationItem[] = [
+    {
+        label: "Home",
+        href: "/",
+    },
+    {
+        label: "Generate",
+        href: "/generate",
+    },
+    {
+        label: "My Generation",
+        href: "/my-generation",
+        protected: true,
+    },
+    {
+        label: "About",
+        href: "/#about",
+        guestOnly: true,
+    },
+    {
+        label: "Contact us",
+        href: "/#contact",
+    },
+];
+
+const isNavigationActive = (
+    pathname: string,
+    href: string
+): boolean => {
+    if (href === "/") {
+        return pathname === "/";
+    }
+
+    if (href.startsWith("/#")) {
+        return false;
+    }
+
+    return (
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
+    );
+};
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -32,11 +82,38 @@ export default function Navbar() {
         logout,
     } = useAuth();
 
-    const [isMobileMenuOpen, setIsMobileMenuOpen] =
-        useState(false);
+    const [
+        isMobileMenuOpen,
+        setIsMobileMenuOpen,
+    ] = useState(false);
 
-    const [isProfileMenuOpen, setIsProfileMenuOpen] =
-        useState(false);
+    const [
+        isProfileMenuOpen,
+        setIsProfileMenuOpen,
+    ] = useState(false);
+
+    const [
+        isLoggingOut,
+        setIsLoggingOut,
+    ] = useState(false);
+
+    const visibleNavigationItems =
+        navigationItems.filter((item) => {
+            if (item.protected && !isLoggedIn) {
+                return false;
+            }
+
+            if (item.guestOnly && isLoggedIn) {
+                return false;
+            }
+
+            return true;
+        });
+
+    const userInitial =
+        user?.name?.trim().charAt(0).toUpperCase() ||
+        user?.email?.trim().charAt(0).toUpperCase() ||
+        "U";
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -53,59 +130,63 @@ export default function Navbar() {
 
         document.body.style.overflow = "hidden";
 
-        const handleEscapeKey = (
-            event: KeyboardEvent
-        ) => {
-            if (event.key === "Escape") {
-                setIsMobileMenuOpen(false);
-            }
-        };
-
-        window.addEventListener(
-            "keydown",
-            handleEscapeKey
-        );
-
         return () => {
             document.body.style.overflow =
                 previousOverflow;
-
-            window.removeEventListener(
-                "keydown",
-                handleEscapeKey
-            );
         };
     }, [isMobileMenuOpen]);
 
-    const isActiveRoute = (href: string) => {
-        if (href === "/") {
-            return pathname === "/";
-        }
+    useEffect(() => {
+        const closeProfileMenu = (
+            event: MouseEvent
+        ) => {
+            const target = event.target;
 
-        return pathname.startsWith(href);
-    };
+            if (!(target instanceof Element)) {
+                return;
+            }
 
-    const desktopLinkClass = (href: string) =>
-        [
-            "transition-colors hover:text-pink-500",
-            isActiveRoute(href)
-                ? "text-pink-500"
-                : "text-white",
-        ].join(" ");
+            if (
+                !target.closest(
+                    "[data-profile-menu]"
+                )
+            ) {
+                setIsProfileMenuOpen(false);
+            }
+        };
+
+        document.addEventListener(
+            "mousedown",
+            closeProfileMenu
+        );
+
+        return () => {
+            document.removeEventListener(
+                "mousedown",
+                closeProfileMenu
+            );
+        };
+    }, []);
 
     const handleLogout = async () => {
-        setIsProfileMenuOpen(false);
-        setIsMobileMenuOpen(false);
+        if (isLoggingOut) {
+            return;
+        }
 
-        await logout();
+        try {
+            setIsLoggingOut(true);
 
-        router.replace("/");
-        router.refresh();
+            await logout();
+
+            setIsProfileMenuOpen(false);
+            setIsMobileMenuOpen(false);
+
+            router.push("/");
+            router.refresh();
+        } finally {
+            setIsLoggingOut(false);
+        }
     };
-
-    const userInitial =
-        user?.name?.trim().charAt(0).toUpperCase() ||
-        "U";
 
     return (
         <>
@@ -124,82 +205,73 @@ export default function Navbar() {
                     damping: 70,
                     mass: 1,
                 }}
-                className="fixed top-0 right-0 left-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-black/70 px-6 py-4 text-white backdrop-blur-md md:px-16 lg:px-24 xl:px-32"
+                className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-black/40 px-6 py-4 backdrop-blur-md md:px-16 lg:px-24 xl:px-32"
             >
+                {/* Logo */}
                 <Link
                     href="/"
                     aria-label="Go to Thumblify homepage"
-                    className="shrink-0"
+                    className="relative block h-[34px] w-[140px] shrink-0"
                 >
                     <Image
                         src="/logo.svg"
                         alt="Thumblify"
-                        width={140}
-                        height={34}
+                        fill
                         priority
-                        className="h-auto w-[140px]"
+                        sizes="140px"
+                        className="object-contain object-left"
                     />
                 </Link>
 
                 {/* Desktop navigation */}
                 <div className="hidden items-center gap-8 md:flex">
-                    <Link
-                        href="/"
-                        className={desktopLinkClass("/")}
-                    >
-                        Home
-                    </Link>
+                    {visibleNavigationItems.map(
+                        (item) => {
+                            const isActive =
+                                isNavigationActive(
+                                    pathname,
+                                    item.href
+                                );
 
-                    <Link
-                        href="/generate"
-                        className={desktopLinkClass(
-                            "/generate"
-                        )}
-                    >
-                        Generate
-                    </Link>
-
-                    {isLoggedIn ? (
-                        <Link
-                            href="/my-generation"
-                            className={desktopLinkClass(
-                                "/my-generation"
-                            )}
-                        >
-                            My Generation
-                        </Link>
-                    ) : (
-                        <Link
-                            href="/#about"
-                            className="text-white transition-colors hover:text-pink-500"
-                        >
-                            About
-                        </Link>
+                            return (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={`transition ${isActive
+                                        ? "text-pink-500"
+                                        : "text-white hover:text-pink-500"
+                                        }`}
+                                >
+                                    {item.label}
+                                </Link>
+                            );
+                        }
                     )}
-
-                    <Link
-                        href="/#contact"
-                        className="text-white transition-colors hover:text-pink-500"
-                    >
-                        Contact us
-                    </Link>
                 </div>
 
+                {/* Account controls */}
                 <div className="flex items-center gap-3">
                     {!isAuthLoading &&
-                        (isLoggedIn ? (
-                            <div className="relative">
+                        isLoggedIn &&
+                        user && (
+                            <div
+                                data-profile-menu
+                                className="relative"
+                            >
                                 <button
                                     type="button"
-                                    aria-label="Open user menu"
-                                    aria-expanded={isProfileMenuOpen}
                                     onClick={() =>
                                         setIsProfileMenuOpen(
                                             (currentValue) =>
                                                 !currentValue
                                         )
                                     }
-                                    className="flex size-9 items-center justify-center rounded-full border-2 border-white/10 bg-white/20 font-medium text-white transition hover:border-pink-500/50 hover:bg-white/25"
+                                    aria-label="Open profile menu"
+                                    aria-haspopup="menu"
+                                    aria-expanded={
+                                        isProfileMenuOpen
+                                    }
+                                    className="flex size-9 items-center justify-center rounded-full border-2 border-white/10 bg-white/20 text-sm font-medium text-white transition hover:border-pink-500/60"
                                 >
                                     {userInitial}
                                 </button>
@@ -207,74 +279,96 @@ export default function Navbar() {
                                 <AnimatePresence>
                                     {isProfileMenuOpen && (
                                         <motion.div
+                                            role="menu"
                                             initial={{
-                                                opacity: 0,
                                                 y: -8,
+                                                opacity: 0,
                                                 scale: 0.96,
                                             }}
                                             animate={{
-                                                opacity: 1,
                                                 y: 0,
+                                                opacity: 1,
                                                 scale: 1,
                                             }}
                                             exit={{
-                                                opacity: 0,
                                                 y: -8,
+                                                opacity: 0,
                                                 scale: 0.96,
                                             }}
                                             transition={{
                                                 duration: 0.15,
                                             }}
-                                            className="absolute top-12 right-0 min-w-44 rounded-xl border border-white/10 bg-[#160711] p-2 shadow-2xl"
+                                            className="absolute top-full right-0 mt-3 w-52 overflow-hidden rounded-xl border border-white/10 bg-zinc-950 p-2 shadow-2xl"
                                         >
                                             <div className="border-b border-white/10 px-3 py-2">
                                                 <p className="truncate text-sm font-medium text-white">
-                                                    {user?.name}
+                                                    {user.name}
                                                 </p>
 
-                                                <p className="truncate text-xs text-white/50">
-                                                    {user?.email}
+                                                <p className="truncate text-xs text-zinc-400">
+                                                    {user.email}
                                                 </p>
                                             </div>
 
                                             <Link
                                                 href="/my-generation"
-                                                className="mt-1 block rounded-lg px-3 py-2 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                                                role="menuitem"
+                                                className="mt-1 block rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/10 hover:text-white"
                                             >
-                                                My Generation
+                                                My Generations
                                             </Link>
 
                                             <button
                                                 type="button"
-                                                onClick={handleLogout}
-                                                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-pink-400 transition hover:bg-pink-500/10"
+                                                role="menuitem"
+                                                onClick={() =>
+                                                    void handleLogout()
+                                                }
+                                                disabled={isLoggingOut}
+                                                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-pink-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                Logout
+                                                {isLoggingOut
+                                                    ? "Logging out..."
+                                                    : "Logout"}
                                             </button>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
                             </div>
-                        ) : (
+                        )}
+
+                    {!isAuthLoading &&
+                        !isLoggedIn && (
                             <Link
                                 href="/login"
-                                className="hidden rounded-full bg-pink-600 px-6 py-2.5 text-white transition-all hover:bg-pink-700 active:scale-95 md:block"
+                                className="hidden rounded-full bg-pink-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-pink-700 active:scale-95 md:block"
                             >
                                 Get Started
                             </Link>
-                        ))}
+                        )}
 
-                    {/* Mobile menu button */}
+                    {isAuthLoading && (
+                        <div
+                            aria-label="Loading account"
+                            className="size-9 animate-pulse rounded-full bg-white/10"
+                        />
+                    )}
+
                     <button
                         type="button"
-                        aria-label="Open navigation menu"
-                        aria-expanded={isMobileMenuOpen}
                         onClick={() =>
                             setIsMobileMenuOpen(true)
                         }
-                        className="rounded-md p-1 text-white transition active:scale-90 md:hidden"
+                        aria-label="Open navigation menu"
+                        aria-expanded={
+                            isMobileMenuOpen
+                        }
+                        className="text-white transition active:scale-90 md:hidden"
                     >
-                        <MenuIcon size={26} />
+                        <MenuIcon
+                            aria-hidden="true"
+                            className="size-7"
+                        />
                     </button>
                 </div>
             </motion.nav>
@@ -296,57 +390,76 @@ export default function Navbar() {
                             duration: 0.3,
                             ease: "easeInOut",
                         }}
-                        className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 bg-black/90 text-lg text-white backdrop-blur-md md:hidden"
+                        className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-8 bg-black/80 text-lg text-white backdrop-blur-md md:hidden"
                     >
-                        <Link href="/">
-                            Home
-                        </Link>
+                        {visibleNavigationItems.map(
+                            (item) => {
+                                const isActive =
+                                    isNavigationActive(
+                                        pathname,
+                                        item.href
+                                    );
 
-                        <Link href="/generate">
-                            Generate
-                        </Link>
-
-                        {isLoggedIn ? (
-                            <Link href="/my-generation">
-                                My Generation
-                            </Link>
-                        ) : (
-                            <Link href="/#about">
-                                About
-                            </Link>
+                                return (
+                                    <Link
+                                        key={item.label}
+                                        href={item.href}
+                                        onClick={() =>
+                                            setIsMobileMenuOpen(
+                                                false
+                                            )
+                                        }
+                                        className={`transition ${isActive
+                                            ? "text-pink-500"
+                                            : "hover:text-pink-500"
+                                            }`}
+                                    >
+                                        {item.label}
+                                    </Link>
+                                );
+                            }
                         )}
 
-                        <Link href="/#contact">
-                            Contact Us
-                        </Link>
-
                         {!isAuthLoading &&
-                            (isLoggedIn ? (
+                            isLoggedIn && (
                                 <button
                                     type="button"
-                                    onClick={handleLogout}
-                                    className="text-pink-400"
+                                    onClick={() =>
+                                        void handleLogout()
+                                    }
+                                    disabled={isLoggingOut}
+                                    className="transition hover:text-pink-500 disabled:opacity-60"
                                 >
-                                    Logout
+                                    {isLoggingOut
+                                        ? "Logging out..."
+                                        : "Logout"}
                                 </button>
-                            ) : (
+                            )}
+
+                        {!isAuthLoading &&
+                            !isLoggedIn && (
                                 <Link
                                     href="/login"
-                                    className="rounded-full bg-pink-600 px-7 py-2.5"
+                                    onClick={() =>
+                                        setIsMobileMenuOpen(
+                                            false
+                                        )
+                                    }
+                                    className="transition hover:text-pink-500"
                                 >
                                     Login
                                 </Link>
-                            ))}
+                            )}
 
                         <button
                             type="button"
-                            aria-label="Close navigation menu"
                             onClick={() =>
                                 setIsMobileMenuOpen(false)
                             }
+                            aria-label="Close navigation menu"
                             className="flex size-10 items-center justify-center rounded-md bg-pink-600 p-1 text-white transition hover:bg-pink-700 active:ring-3 active:ring-white"
                         >
-                            <XIcon />
+                            <XIcon aria-hidden="true" />
                         </button>
                     </motion.div>
                 )}

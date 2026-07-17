@@ -21,43 +21,75 @@ const getErrorMessage = (
     return "Unable to generate thumbnail";
 };
 
+const getErrorStatus = (
+    message: string
+): number => {
+    const normalizedMessage =
+        message.toLowerCase();
+
+    if (
+        normalizedMessage.includes("unauthorized") ||
+        normalizedMessage.includes("login")
+    ) {
+        return 401;
+    }
+
+    return 500;
+};
+
 export async function POST(request: Request) {
     let thumbnailId: string | null = null;
 
     try {
         const user = await requireUser();
 
-        const body: unknown = await request.json();
+        const requestBody: unknown =
+            await request.json();
 
         const input =
-            generateThumbnailSchema.parse(body);
+            generateThumbnailSchema.parse(
+                requestBody
+            );
 
         await connectDatabase();
 
-        const thumbnail = await Thumbnail.create({
-            userId: user._id.toString(),
+        const thumbnail =
+            await Thumbnail.create({
+                userId: user._id.toString(),
 
-            title: input.title,
-            style: input.style,
+                title: input.title,
+                style: input.style,
 
-            aspect_ratio: input.aspect_ratio,
-            color_scheme: input.color_scheme,
-            text_overlay: input.text_overlay,
+                aspect_ratio:
+                    input.aspect_ratio,
 
-            user_prompt: input.prompt,
-            prompt_used: "",
+                color_scheme:
+                    input.color_scheme,
 
-            image_url: "",
-            cloudinary_public_id: "",
+                text_overlay:
+                    input.text_overlay,
 
-            isGenerating: true,
-            generation_error: "",
-        });
+                user_prompt:
+                    input.prompt,
 
-        thumbnailId = thumbnail._id.toString();
+                prompt_used: "",
+
+                image_url: "",
+
+                cloudinary_public_id: "",
+
+                isGenerating: true,
+
+                generation_error: "",
+            });
+
+        thumbnailId =
+            thumbnail._id.toString();
 
         const generatedImage =
-            await generateThumbnailImage(input);
+            await generateThumbnailImage(
+                input
+            );
 
         const uploadedImage =
             await uploadImageBuffer(
@@ -75,6 +107,7 @@ export async function POST(request: Request) {
             generatedImage.promptUsed;
 
         thumbnail.isGenerating = false;
+
         thumbnail.generation_error = "";
 
         await thumbnail.save();
@@ -110,9 +143,9 @@ export async function POST(request: Request) {
                         },
                     }
                 );
-            } catch (updateError) {
+            } catch (updateError: unknown) {
                 console.error(
-                    "Failed thumbnail status update failed:",
+                    "Unable to update failed thumbnail:",
                     updateError
                 );
             }
@@ -137,7 +170,8 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid JSON request body",
+                    message:
+                        "Invalid JSON request body",
                 },
                 {
                     status: 400,
@@ -145,13 +179,8 @@ export async function POST(request: Request) {
             );
         }
 
-        const message = getErrorMessage(error);
-
-        const status =
-            message.toLowerCase().includes("unauthorized") ||
-                message.toLowerCase().includes("login")
-                ? 401
-                : 500;
+        const message =
+            getErrorMessage(error);
 
         return NextResponse.json(
             {
@@ -159,7 +188,8 @@ export async function POST(request: Request) {
                 message,
             },
             {
-                status,
+                status:
+                    getErrorStatus(message),
             }
         );
     }
