@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { requireUser } from "@/lib/auth/require-user";
-import { uploadImageBuffer } from "@/lib/cloudinary/upload-image";
+import cloudinary from "@/lib/cloudinary/cloudinary";
+
+import {
+    uploadImageBuffer,
+    type UploadedImage,
+} from "@/lib/cloudinary/upload-image";
+
 import connectDatabase from "@/lib/db/connect-db";
 import { generateThumbnailImage } from "@/lib/services/generate-thumbnail-image";
 import { generateThumbnailSchema } from "@/lib/validations/thumbnail.schema";
+
 import Thumbnail from "@/models/Thumbnail";
+import ThumbnailVersion from "@/models/ThumbnailVersion";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -24,13 +32,38 @@ const getErrorMessage = (
 const isUnauthorizedMessage = (
     message: string
 ): boolean => {
-    const normalized =
+    const normalizedMessage =
         message.toLowerCase();
 
     return (
-        normalized.includes("unauthorized") ||
-        normalized.includes("login")
+        normalizedMessage.includes(
+            "unauthorized"
+        ) ||
+        normalizedMessage.includes("login")
     );
+};
+
+const destroyCloudinaryImage = async (
+    publicId: string | undefined
+) => {
+    if (!publicId) {
+        return;
+    }
+
+    try {
+        await cloudinary.uploader.destroy(
+            publicId,
+            {
+                resource_type: "image",
+                invalidate: true,
+            }
+        );
+    } catch (error) {
+        console.error(
+            "Generated image cleanup failed:",
+            error
+        );
+    }
 };
 
 export async function POST(
@@ -38,8 +71,19 @@ export async function POST(
 ) {
     let thumbnailId: string | null = null;
 
+    let thumbnailVersionId:
+        | string
+        | null = null;
+
+    let uploadedImage:
+        | UploadedImage
+        | null = null;
+
     try {
         const user = await requireUser();
+
+        const userId =
+            user._id.toString();
 
         const requestBody: unknown =
             await request.json();
@@ -51,32 +95,30 @@ export async function POST(
 
         await connectDatabase();
 
+        /*
+         * Parent thumbnail project তৈরি হচ্ছে।
+         * এখনো কোনো image version তৈরি হয়নি।
+         */
         const thumbnail =
             await Thumbnail.create({
-                userId: user._id.toString(),
+                userId,
 
                 title: input.title,
-                style: input.style,
+                description: "",
 
+                style: input.style,
                 aspect_ratio:
                     input.aspect_ratio,
-
                 color_scheme:
                     input.color_scheme,
-
                 text_overlay:
                     input.text_overlay,
-
-                user_prompt:
-                    input.prompt,
-
-                prompt_used: "",
 
                 image_url: "",
                 cloudinary_public_id: "",
 
-                isGenerating: true,
-                generation_error: "",
+                prompt_used: "",
+                user_prompt: input.prompt,
 
                 model_used:
                     process.env
@@ -85,22 +127,99 @@ export async function POST(
 
                 generation_mode:
                     "flash_generate",
+
+                current_version_id: null,
+                current_version_number: 0,
+                total_versions: 0,
+
+                isGenerating: true,
+                generation_error: "",
             });
 
         thumbnailId =
             thumbnail._id.toString();
 
+        /*
+         * প্রথম image draft তৈরি হচ্ছে।
+         */
         const generatedImage =
             await generateThumbnailImage(
                 input,
                 "flash"
             );
 
-        const uploadedImage =
+        uploadedImage =
             await uploadImageBuffer(
                 generatedImage.buffer,
-                user._id.toString()
+                userId
             );
+
+        /*
+         * প্রথম generation আলাদা version
+         * document হিসেবে সংরক্ষণ করা হচ্ছে।
+         */
+        const thumbnailVersion =
+            await ThumbnailVersion.create({
+                thumbnailId:
+                    thumbnail._id,
+
+                userId,
+
+                version_number: 1,
+
+                title: input.title,
+                description: "",
+
+                style: input.style,
+                aspect_ratio:
+                    input.aspect_ratio,
+                color_scheme:
+                    input.color_scheme,
+                text_overlay:
+                    input.text_overlay,
+
+                image_url:
+                    uploadedImage.secureUrl,
+
+                cloudinary_public_id:
+                    uploadedImage.publicId,
+
+                prompt_used:
+                    generatedImage.promptUsed,
+
+                user_prompt:
+                    input.prompt,
+
+                model_used:
+                    generatedImage.modelUsed,
+
+                generation_mode:
+                    "flash_generate",
+
+                reference_images: [],
+            });
+
+        thumbnailVersionId =
+            thumbnailVersion._id.toString();
+
+        /*
+         * Parent thumbnail-এর selected/current
+         * version snapshot update করা হচ্ছে।
+         */
+        thumbnail.title =
+            input.title;
+
+        thumbnail.style =
+            input.style;
+
+        thumbnail.aspect_ratio =
+            input.aspect_ratio;
+
+        thumbnail.color_scheme =
+            input.color_scheme;
+
+        thumbnail.text_overlay =
+            input.text_overlay;
 
         thumbnail.image_url =
             uploadedImage.secureUrl;
@@ -111,11 +230,22 @@ export async function POST(
         thumbnail.prompt_used =
             generatedImage.promptUsed;
 
+        thumbnail.user_prompt =
+            input.prompt;
+
         thumbnail.model_used =
             generatedImage.modelUsed;
 
         thumbnail.generation_mode =
             "flash_generate";
+
+        thumbnail.current_version_id =
+            thumbnailVersion._id;
+
+        thumbnail.current_version_number =
+            1;
+
+        thumbnail.total_versions = 1;
 
         thumbnail.isGenerating = false;
         thumbnail.generation_error = "";
@@ -126,8 +256,9 @@ export async function POST(
             {
                 success: true,
                 message:
-                    "Thumbnail generated with Flash successfully",
+                    "Thumbnail generated successfully",
                 thumbnail,
+                version: thumbnailVersion,
             },
             {
                 status: 201,
@@ -135,10 +266,43 @@ export async function POST(
         );
     } catch (error: unknown) {
         console.error(
-            "Flash thumbnail generation failed:",
+            "Thumbnail generation failed:",
             error
         );
 
+        /*
+         * Version তৈরি হওয়ার পরে parent save fail
+         * করলে অসম্পূর্ণ version delete হবে।
+         */
+        if (thumbnailVersionId) {
+            try {
+                await connectDatabase();
+
+                await ThumbnailVersion.findByIdAndDelete(
+                    thumbnailVersionId
+                );
+            } catch (versionCleanupError) {
+                console.error(
+                    "Thumbnail version cleanup failed:",
+                    versionCleanupError
+                );
+            }
+        }
+
+        /*
+         * Database flow complete না হলে uploaded
+         * Cloudinary image orphan হওয়া থেকে রক্ষা।
+         */
+        if (uploadedImage?.publicId) {
+            await destroyCloudinaryImage(
+                uploadedImage.publicId
+            );
+        }
+
+        /*
+         * Parent project রেখে failure status save
+         * করা হচ্ছে, যাতে error trace থাকে।
+         */
         if (thumbnailId) {
             try {
                 await connectDatabase();
@@ -148,8 +312,16 @@ export async function POST(
                     {
                         $set: {
                             isGenerating: false,
+
                             generation_error:
                                 getErrorMessage(error),
+
+                            image_url: "",
+                            cloudinary_public_id: "",
+
+                            current_version_id: null,
+                            current_version_number: 0,
+                            total_versions: 0,
                         },
                     }
                 );
@@ -165,9 +337,11 @@ export async function POST(
             return NextResponse.json(
                 {
                     success: false,
+
                     message:
                         error.issues[0]?.message ??
                         "Invalid thumbnail information",
+
                     errors: error.flatten(),
                 },
                 {

@@ -19,6 +19,7 @@ import toast from "react-hot-toast";
 import AspectRatioSelector from "@/components/thumbnail/AspectRatioSelector";
 import ColorSchemeSelector from "@/components/thumbnail/ColorSchemeSelector";
 import PreviewPanel from "@/components/thumbnail/PreviewPanel";
+import ReferenceImageUploader from "@/components/thumbnail/ReferenceImageUploader";
 import StyleSelector from "@/components/thumbnail/StyleSelector";
 import SoftBackdrop from "@/components/ui/SoftBackdrop";
 import { useAuth } from "@/context/AuthContext";
@@ -38,6 +39,7 @@ interface ThumbnailApiResponse {
     success: boolean;
     message: string;
     thumbnail?: Thumbnail;
+    referenceImageCount?: number;
 }
 
 type ThumbnailAction =
@@ -49,6 +51,17 @@ interface GenerationStatus {
     label: string;
     className: string;
 }
+
+interface ThumbnailRequestBody {
+    title: string;
+    prompt: string;
+    style: ThumbnailStyle;
+    aspect_ratio: AspectRatio;
+    color_scheme: ColorSchemeId;
+    text_overlay: boolean;
+}
+
+const MAXIMUM_REFERENCE_IMAGES = 3;
 
 const readApiResponse = async (
     response: Response
@@ -160,6 +173,11 @@ export default function GenerateWorkspace({
         useState<Thumbnail | null>(null);
 
     const [
+        referenceImages,
+        setReferenceImages,
+    ] = useState<File[]>([]);
+
+    const [
         isFetchingThumbnail,
         setIsFetchingThumbnail,
     ] = useState(Boolean(thumbnailId));
@@ -223,6 +241,7 @@ export default function GenerateWorkspace({
     useEffect(() => {
         if (!thumbnailId) {
             setThumbnail(null);
+            setReferenceImages([]);
             setIsFetchingThumbnail(false);
             return;
         }
@@ -326,6 +345,73 @@ export default function GenerateWorkspace({
         router,
     ]);
 
+    const createRequestBody =
+        (): ThumbnailRequestBody => {
+            return {
+                title: title.trim(),
+
+                prompt:
+                    additionalDetails.trim(),
+
+                style,
+
+                aspect_ratio:
+                    aspectRatio,
+
+                color_scheme:
+                    colorSchemeId,
+
+                text_overlay: true,
+            };
+        };
+
+    const createJsonRequestOptions = (
+        requestBody: ThumbnailRequestBody
+    ): RequestInit => {
+        return {
+            method: "POST",
+            credentials: "include",
+
+            headers: {
+                "Content-Type":
+                    "application/json",
+            },
+
+            body: JSON.stringify(
+                requestBody
+            ),
+        };
+    };
+
+    const createEnhanceRequestOptions = (
+        requestBody: ThumbnailRequestBody
+    ): RequestInit => {
+        const formData =
+            new FormData();
+
+        formData.append(
+            "input",
+            JSON.stringify(
+                requestBody
+            )
+        );
+
+        referenceImages.forEach(
+            (referenceImage) => {
+                formData.append(
+                    "referenceImages",
+                    referenceImage
+                );
+            }
+        );
+
+        return {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+        };
+    };
+
     const handleAction = async (
         action: ThumbnailAction
     ) => {
@@ -352,11 +438,23 @@ export default function GenerateWorkspace({
         }
 
         if (
+            referenceImages.length >
+            MAXIMUM_REFERENCE_IMAGES
+        ) {
+            toast.error(
+                "A maximum of 3 reference images is allowed"
+            );
+
+            return;
+        }
+
+        if (
             action === "enhance" &&
+            referenceImages.length === 0 &&
             !thumbnail?.image_url
         ) {
             toast.error(
-                "Generate a thumbnail before using Premium Enhance"
+                "Upload a reference image or generate a thumbnail first"
             );
 
             return;
@@ -381,37 +479,24 @@ export default function GenerateWorkspace({
                 `/api/thumbnails/${thumbnailId}/enhance`;
         }
 
+        const requestBody =
+            createRequestBody();
+
+        const requestOptions =
+            action === "enhance"
+                ? createEnhanceRequestOptions(
+                    requestBody
+                )
+                : createJsonRequestOptions(
+                    requestBody
+                );
+
         setActiveAction(action);
 
         try {
             const response = await fetch(
                 endpoint,
-                {
-                    method: "POST",
-                    credentials: "include",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-                    },
-
-                    body: JSON.stringify({
-                        title: title.trim(),
-
-                        prompt:
-                            additionalDetails.trim(),
-
-                        style,
-
-                        aspect_ratio:
-                            aspectRatio,
-
-                        color_scheme:
-                            colorSchemeId,
-
-                        text_overlay: true,
-                    }),
-                }
+                requestOptions
             );
 
             const data =
@@ -431,6 +516,10 @@ export default function GenerateWorkspace({
             applyThumbnailToForm(
                 data.thumbnail
             );
+
+            if (action === "enhance") {
+                setReferenceImages([]);
+            }
 
             toast.success(
                 getSuccessMessage(action)
@@ -478,6 +567,10 @@ export default function GenerateWorkspace({
 
     const generationStatus =
         getGenerationStatus(thumbnail);
+
+    const canEnhance =
+        referenceImages.length > 0 ||
+        Boolean(thumbnail?.image_url);
 
     return (
         <>
@@ -583,6 +676,22 @@ export default function GenerateWorkspace({
                                     />
                                 </div>
 
+                                {isEditMode && (
+                                    <ReferenceImageUploader
+                                        files={referenceImages}
+                                        onChange={
+                                            setReferenceImages
+                                        }
+                                        maximumFiles={
+                                            MAXIMUM_REFERENCE_IMAGES
+                                        }
+                                        disabled={
+                                            isSubmitting ||
+                                            isFetchingThumbnail
+                                        }
+                                    />
+                                )}
+
                                 {!isEditMode && (
                                     <button
                                         type="button"
@@ -648,7 +757,7 @@ export default function GenerateWorkspace({
                                                 isSubmitting ||
                                                 isFetchingThumbnail ||
                                                 isAuthLoading ||
-                                                !thumbnail?.image_url
+                                                !canEnhance
                                             }
                                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-b from-amber-300 to-yellow-500 py-3.5 text-[15px] font-semibold text-zinc-950 transition hover:from-amber-200 hover:to-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
@@ -668,21 +777,28 @@ export default function GenerateWorkspace({
                                                 <span className="font-medium text-zinc-200">
                                                     Regenerate:
                                                 </span>{" "}
-                                                Use this when you want a
-                                                fresh image based on your
-                                                updated title, prompt,
-                                                style, color, or layout.
+                                                Create a completely fresh
+                                                version using your updated
+                                                title, style, colors and
+                                                instructions.
                                             </p>
 
                                             <p>
                                                 <span className="font-medium text-amber-300">
                                                     Premium Enhance:
                                                 </span>{" "}
-                                                Use this when you like the
-                                                current concept and want a
-                                                more polished final version
-                                                while preserving its main
-                                                visual direction.
+                                                Upload up to three reference
+                                                images. The first image will
+                                                guide the main composition,
+                                                while the others provide
+                                                supporting visual details.
+                                            </p>
+
+                                            <p>
+                                                When no reference image is
+                                                uploaded, the current
+                                                thumbnail will be used
+                                                automatically.
                                             </p>
                                         </div>
                                     </div>

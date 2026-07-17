@@ -2,6 +2,7 @@ import "server-only";
 
 import mongoose, {
     Schema,
+    Types,
     type HydratedDocument,
     type Model,
 } from "mongoose";
@@ -21,26 +22,41 @@ import type {
 
 export interface IThumbnail {
     userId: string;
+
     title: string;
     description?: string;
 
     style: ThumbnailStyle;
     aspect_ratio: AspectRatio;
     color_scheme: ColorSchemeId;
-
     text_overlay: boolean;
 
+    /*
+     * বর্তমানে user যে version নির্বাচন করেছে,
+     * তার snapshot নিচের fields-এ থাকবে।
+     *
+     * Existing frontend এবং API-এর সঙ্গে
+     * backward compatibility রাখার জন্য
+     * এগুলো বাদ দেওয়া হচ্ছে না।
+     */
     image_url: string;
     cloudinary_public_id?: string;
 
     prompt_used?: string;
     user_prompt?: string;
 
-    isGenerating: boolean;
-    generation_error?: string;
-
     model_used?: string;
     generation_mode?: ThumbnailGenerationMode;
+
+    /*
+     * Version history সম্পর্কিত fields।
+     */
+    current_version_id?: Types.ObjectId | null;
+    current_version_number: number;
+    total_versions: number;
+
+    isGenerating: boolean;
+    generation_error?: string;
 
     createdAt?: Date;
     updatedAt?: Date;
@@ -53,6 +69,12 @@ const colorSchemeIds = colorSchemes.map(
     (scheme) => scheme.id
 );
 
+const generationModes: ThumbnailGenerationMode[] = [
+    "flash_generate",
+    "flash_regenerate",
+    "pro_enhance",
+];
+
 const ThumbnailSchema = new Schema<IThumbnail>(
     {
         userId: {
@@ -64,9 +86,15 @@ const ThumbnailSchema = new Schema<IThumbnail>(
 
         title: {
             type: String,
-            required: [true, "Thumbnail title is required"],
+            required: [
+                true,
+                "Thumbnail title is required",
+            ],
             trim: true,
-            minlength: [1, "Title is required"],
+            minlength: [
+                1,
+                "Title is required",
+            ],
             maxlength: [
                 100,
                 "Title cannot exceed 100 characters",
@@ -76,6 +104,7 @@ const ThumbnailSchema = new Schema<IThumbnail>(
         description: {
             type: String,
             trim: true,
+            default: "",
             maxlength: [
                 500,
                 "Description cannot exceed 500 characters",
@@ -84,7 +113,10 @@ const ThumbnailSchema = new Schema<IThumbnail>(
 
         style: {
             type: String,
-            required: [true, "Thumbnail style is required"],
+            required: [
+                true,
+                "Thumbnail style is required",
+            ],
             enum: {
                 values: [...thumbnailStyles],
                 message: "Invalid thumbnail style",
@@ -93,7 +125,10 @@ const ThumbnailSchema = new Schema<IThumbnail>(
 
         aspect_ratio: {
             type: String,
-            required: true,
+            required: [
+                true,
+                "Aspect ratio is required",
+            ],
             enum: {
                 values: [...aspectRatios],
                 message: "Invalid aspect ratio",
@@ -103,7 +138,10 @@ const ThumbnailSchema = new Schema<IThumbnail>(
 
         color_scheme: {
             type: String,
-            required: true,
+            required: [
+                true,
+                "Color scheme is required",
+            ],
             enum: {
                 values: [...colorSchemeIds],
                 message: "Invalid color scheme",
@@ -116,6 +154,9 @@ const ThumbnailSchema = new Schema<IThumbnail>(
             default: true,
         },
 
+        /*
+         * Selected/current version snapshot.
+         */
         image_url: {
             type: String,
             trim: true,
@@ -143,9 +184,55 @@ const ThumbnailSchema = new Schema<IThumbnail>(
             trim: true,
             default: "",
             maxlength: [
-                2000,
-                "Additional prompt cannot exceed 2000 characters",
+                4000,
+                "Additional prompt cannot exceed 4000 characters",
             ],
+        },
+
+        model_used: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        generation_mode: {
+            type: String,
+            enum: {
+                values: generationModes,
+                message:
+                    "Invalid thumbnail generation mode",
+            },
+            default: "flash_generate",
+        },
+
+        /*
+         * যে version বর্তমানে selected/final।
+         */
+        current_version_id: {
+            type: Schema.Types.ObjectId,
+            ref: "ThumbnailVersion",
+            default: null,
+        },
+
+        current_version_number: {
+            type: Number,
+            min: [
+                0,
+                "Current version number cannot be negative",
+            ],
+            default: 0,
+        },
+
+        /*
+         * এই thumbnail project-এর মোট version।
+         */
+        total_versions: {
+            type: Number,
+            min: [
+                0,
+                "Total versions cannot be negative",
+            ],
+            default: 0,
         },
 
         isGenerating: {
@@ -162,22 +249,6 @@ const ThumbnailSchema = new Schema<IThumbnail>(
                 "Generation error cannot exceed 1000 characters",
             ],
         },
-
-        model_used: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        generation_mode: {
-            type: String,
-            enum: [
-                "flash_generate",
-                "flash_regenerate",
-                "pro_enhance",
-            ],
-            default: "flash_generate",
-        },
     },
     {
         timestamps: true,
@@ -185,14 +256,29 @@ const ThumbnailSchema = new Schema<IThumbnail>(
     }
 );
 
+/*
+ * My Generation pagination:
+ * newest updated thumbnail project আগে আসবে।
+ */
 ThumbnailSchema.index({
     userId: 1,
-    createdAt: -1,
+    updatedAt: -1,
+});
+
+/*
+ * একজন user-এর নির্দিষ্ট current version
+ * খুঁজতে কাজে লাগবে।
+ */
+ThumbnailSchema.index({
+    userId: 1,
+    current_version_id: 1,
 });
 
 const Thumbnail =
     (mongoose.models
-        .Thumbnail as Model<IThumbnail> | undefined) ??
+        .Thumbnail as
+        | Model<IThumbnail>
+        | undefined) ??
     mongoose.model<IThumbnail>(
         "Thumbnail",
         ThumbnailSchema

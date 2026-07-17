@@ -21,10 +21,14 @@ export type ImageModelTier =
     | "flash"
     | "pro";
 
-interface SourceImageData {
+export interface SourceImageData {
     data: string;
     mimeType: string;
 }
+
+export type SourceImageInput =
+    | string
+    | SourceImageData;
 
 export interface GeneratedThumbnailImage {
     buffer: Buffer;
@@ -32,6 +36,18 @@ export interface GeneratedThumbnailImage {
     mimeType: string;
     modelUsed: string;
 }
+
+const MAX_REFERENCE_IMAGES = 3;
+
+const MAX_REFERENCE_IMAGE_SIZE =
+    10 * 1024 * 1024;
+
+const allowedReferenceMimeTypes =
+    new Set([
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    ]);
 
 const stylePrompts: Record<
     ThumbnailStyle,
@@ -82,18 +98,53 @@ const colorSchemeDescriptions: Record<
         "soft pastel colors with gentle, friendly, low-saturation tones",
 };
 
+const normalizeMimeType = (
+    mimeType: string
+): string => {
+    const normalized =
+        mimeType
+            .split(";")[0]
+            ?.trim()
+            .toLowerCase();
+
+    if (
+        normalized ===
+        "image/jpg"
+    ) {
+        return "image/jpeg";
+    }
+
+    return normalized || "image/png";
+};
+
+const validateMimeType = (
+    mimeType: string
+) => {
+    if (
+        !allowedReferenceMimeTypes.has(
+            mimeType
+        )
+    ) {
+        throw new Error(
+            "Reference images must be JPG, PNG, or WebP files"
+        );
+    }
+};
+
 const getImageModel = (
     tier: ImageModelTier
 ): string => {
     if (tier === "pro") {
         return (
-            process.env.GEMINI_PRO_IMAGE_MODEL ||
+            process.env
+                .GEMINI_PRO_IMAGE_MODEL ||
             "gemini-3-pro-image"
         );
     }
 
     return (
-        process.env.GEMINI_FLASH_IMAGE_MODEL ||
+        process.env
+            .GEMINI_FLASH_IMAGE_MODEL ||
         "gemini-3.1-flash-image"
     );
 };
@@ -103,11 +154,17 @@ const buildThumbnailPrompt = (
 ): string => {
     const promptParts: string[] = [
         `Create ${stylePrompts[data.style]}.`,
+
         `The YouTube video title and topic is: "${data.title}".`,
+
         `Use ${colorSchemeDescriptions[data.color_scheme]}.`,
+
         `The composition must use a ${data.aspect_ratio} aspect ratio.`,
+
         "Design it specifically to maximize YouTube click-through rate.",
+
         "Keep the main subject and headline clearly visible at small mobile thumbnail sizes.",
+
         "Keep the composition professional, balanced, uncluttered, and visually striking.",
     ];
 
@@ -139,32 +196,61 @@ const buildThumbnailPrompt = (
 };
 
 const buildProEnhancementPrompt = (
-    data: GenerateThumbnailData
+    data: GenerateThumbnailData,
+    referenceImageCount: number
 ): string => {
     const promptParts: string[] = [
-        "Enhance and refine the provided existing YouTube thumbnail into a premium final version.",
-        "Use the provided image as the primary visual reference.",
-        "Preserve its successful core concept, recognizable subject, important objects, and overall visual direction.",
-        "Improve professional lighting, clarity, detail, subject anatomy, object quality, typography, visual hierarchy, spacing, and mobile readability.",
+        "Enhance and refine the supplied visual references into one premium final YouTube thumbnail.",
+
+        `You have been given ${referenceImageCount} reference image${referenceImageCount === 1
+            ? ""
+            : "s"
+        }.`,
+
+        "Treat the first image as the primary composition and main visual direction.",
+
+        "Use any additional images only as supporting references for subjects, products, faces, objects, style, lighting, colors, or visual details.",
+
+        "Do not create a collage, split screen, contact sheet, or multiple separate panels unless the creator instructions explicitly request one.",
+
+        "Do not duplicate people, faces, products, objects, backgrounds, or text simply because they appear across multiple references.",
+
+        "Preserve the successful core concept, recognizable main subject, important objects, and overall visual direction of the primary reference.",
+
+        "Improve professional lighting, clarity, detail, subject anatomy, object quality, visual hierarchy, spacing, contrast, and mobile readability.",
+
         `The final thumbnail topic is: "${data.title}".`,
+
         `Use a ${data.aspect_ratio} composition.`,
+
         `Apply ${stylePrompts[data.style]}.`,
+
         `Use ${colorSchemeDescriptions[data.color_scheme]}.`,
+
         "Remove malformed hands, extra fingers, duplicated objects, partial objects near the edges, random symbols, unreadable text, unnecessary clutter, and visual artifacts.",
+
         "Do not add logos or watermarks.",
     ];
 
     if (data.text_overlay) {
         promptParts.push(
-            `Use one clear headline based on "${data.title}".`
+            "Use exactly one clear main headline."
         );
 
         promptParts.push(
-            "Keep the headline correctly spelled, bold, clean, and readable on mobile."
+            "Preserve the existing headline wording from the primary reference image whenever it is already clear and relevant."
         );
 
         promptParts.push(
-            "Do not place additional labels, random numbers, or unrelated text elsewhere in the image."
+            "Do not add, remove, rewrite, or paraphrase headline words unless the creator instructions explicitly request a text correction."
+        );
+
+        promptParts.push(
+            "Keep the headline correctly spelled, bold, clean, high-contrast, and readable on mobile."
+        );
+
+        promptParts.push(
+            "Do not place additional labels, captions, random numbers, or unrelated text elsewhere in the image."
         );
     } else {
         promptParts.push(
@@ -200,6 +286,7 @@ const getGenerationConfig = (
                 threshold:
                     HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             },
+
             {
                 category:
                     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
@@ -207,6 +294,7 @@ const getGenerationConfig = (
                 threshold:
                     HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             },
+
             {
                 category:
                     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
@@ -214,6 +302,7 @@ const getGenerationConfig = (
                 threshold:
                     HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             },
+
             {
                 category:
                     HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -225,70 +314,256 @@ const getGenerationConfig = (
     };
 };
 
-const readSourceImage = async (
-    imageUrl: string
-): Promise<SourceImageData> => {
-    const secureImageUrl =
-        imageUrl.replace(
-            /^http:\/\//,
-            "https://"
-        );
-
-    const response = await fetch(
-        secureImageUrl,
-        {
-            method: "GET",
-            cache: "no-store",
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error(
-            `Unable to load the existing thumbnail for Pro enhancement (${response.status})`
-        );
-    }
-
-    const mimeType =
-        response.headers
-            .get("content-type")
-            ?.split(";")[0]
-            ?.trim() || "image/png";
-
-    if (!mimeType.startsWith("image/")) {
-        throw new Error(
-            "The current thumbnail URL did not return a valid image"
-        );
-    }
-
-    const arrayBuffer =
-        await response.arrayBuffer();
-
-    const buffer =
-        Buffer.from(arrayBuffer);
-
+export const createSourceImageFromBuffer = (
+    buffer: Buffer,
+    mimeType: string
+): SourceImageData => {
     if (buffer.length === 0) {
         throw new Error(
-            "The current thumbnail image is empty"
+            "The reference image is empty"
+        );
+    }
+
+    if (
+        buffer.length >
+        MAX_REFERENCE_IMAGE_SIZE
+    ) {
+        throw new Error(
+            "Each reference image must be smaller than 10 MB"
+        );
+    }
+
+    const normalizedMimeType =
+        normalizeMimeType(mimeType);
+
+    validateMimeType(
+        normalizedMimeType
+    );
+
+    return {
+        data:
+            buffer.toString("base64"),
+
+        mimeType:
+            normalizedMimeType,
+    };
+};
+
+export const createSourceImageFromFile =
+    async (
+        file: File
+    ): Promise<SourceImageData> => {
+        if (file.size === 0) {
+            throw new Error(
+                "The selected reference image is empty"
+            );
+        }
+
+        if (
+            file.size >
+            MAX_REFERENCE_IMAGE_SIZE
+        ) {
+            throw new Error(
+                "Each reference image must be smaller than 10 MB"
+            );
+        }
+
+        const mimeType =
+            normalizeMimeType(
+                file.type
+            );
+
+        validateMimeType(mimeType);
+
+        const arrayBuffer =
+            await file.arrayBuffer();
+
+        const buffer =
+            Buffer.from(arrayBuffer);
+
+        return createSourceImageFromBuffer(
+            buffer,
+            mimeType
+        );
+    };
+
+export const readSourceImageFromUrl =
+    async (
+        imageUrl: string
+    ): Promise<SourceImageData> => {
+        const secureImageUrl =
+            imageUrl.replace(
+                /^http:\/\//,
+                "https://"
+            );
+
+        const response =
+            await fetch(
+                secureImageUrl,
+                {
+                    method: "GET",
+                    cache: "no-store",
+                }
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load a reference image (${response.status})`
+            );
+        }
+
+        const mimeType =
+            normalizeMimeType(
+                response.headers.get(
+                    "content-type"
+                ) || "image/png"
+            );
+
+        validateMimeType(mimeType);
+
+        const contentLengthHeader =
+            response.headers.get(
+                "content-length"
+            );
+
+        if (
+            contentLengthHeader &&
+            Number(contentLengthHeader) >
+            MAX_REFERENCE_IMAGE_SIZE
+        ) {
+            throw new Error(
+                "Each reference image must be smaller than 10 MB"
+            );
+        }
+
+        const arrayBuffer =
+            await response.arrayBuffer();
+
+        const buffer =
+            Buffer.from(arrayBuffer);
+
+        return createSourceImageFromBuffer(
+            buffer,
+            mimeType
+        );
+    };
+
+const validateSourceImageData = (
+    sourceImage: SourceImageData
+): SourceImageData => {
+    const mimeType =
+        normalizeMimeType(
+            sourceImage.mimeType
+        );
+
+    validateMimeType(mimeType);
+
+    if (!sourceImage.data.trim()) {
+        throw new Error(
+            "Reference image data is empty"
+        );
+    }
+
+    let imageBuffer: Buffer;
+
+    try {
+        imageBuffer =
+            Buffer.from(
+                sourceImage.data,
+                "base64"
+            );
+    } catch {
+        throw new Error(
+            "Reference image data is invalid"
+        );
+    }
+
+    if (imageBuffer.length === 0) {
+        throw new Error(
+            "Reference image data is empty"
+        );
+    }
+
+    if (
+        imageBuffer.length >
+        MAX_REFERENCE_IMAGE_SIZE
+    ) {
+        throw new Error(
+            "Each reference image must be smaller than 10 MB"
         );
     }
 
     return {
-        data: buffer.toString("base64"),
+        data:
+            imageBuffer.toString(
+                "base64"
+            ),
+
         mimeType,
     };
+};
+
+const resolveSourceImages = async (
+    sourceInputs:
+        | SourceImageInput
+        | SourceImageInput[]
+): Promise<SourceImageData[]> => {
+    const inputs =
+        Array.isArray(sourceInputs)
+            ? sourceInputs
+            : [sourceInputs];
+
+    if (inputs.length === 0) {
+        throw new Error(
+            "At least one reference image is required for Premium Enhance"
+        );
+    }
+
+    if (
+        inputs.length >
+        MAX_REFERENCE_IMAGES
+    ) {
+        throw new Error(
+            "A maximum of 3 reference images is allowed"
+        );
+    }
+
+    return Promise.all(
+        inputs.map(
+            async (
+                sourceInput
+            ) => {
+                if (
+                    typeof sourceInput ===
+                    "string"
+                ) {
+                    return readSourceImageFromUrl(
+                        sourceInput
+                    );
+                }
+
+                return validateSourceImageData(
+                    sourceInput
+                );
+            }
+        )
+    );
 };
 
 const extractGeneratedImage = (
     response: Awaited<
         ReturnType<
-            typeof gemini.models.generateContent
+            typeof gemini.models
+            .generateContent
         >
     >,
+
     promptUsed: string,
     modelUsed: string
 ): GeneratedThumbnailImage => {
     const responseParts =
-        response.candidates?.[0]?.content?.parts;
+        response.candidates?.[0]
+            ?.content?.parts;
 
     if (!responseParts?.length) {
         throw new Error(
@@ -299,21 +574,30 @@ const extractGeneratedImage = (
     const generatedImagePart =
         responseParts.find(
             (part) =>
-                typeof part.inlineData?.data ===
+                typeof part.inlineData
+                    ?.data ===
                 "string"
         );
 
     const base64Image =
-        generatedImagePart?.inlineData?.data;
+        generatedImagePart
+            ?.inlineData?.data;
 
     if (!base64Image) {
-        const textResponse = responseParts
-            .map((part) => part.text)
-            .filter(
-                (text): text is string =>
-                    typeof text === "string"
-            )
-            .join(" ");
+        const textResponse =
+            responseParts
+                .map(
+                    (part) =>
+                        part.text
+                )
+                .filter(
+                    (
+                        text
+                    ): text is string =>
+                        typeof text ===
+                        "string"
+                )
+                .join(" ");
 
         throw new Error(
             textResponse
@@ -328,7 +612,9 @@ const extractGeneratedImage = (
             "base64"
         );
 
-    if (imageBuffer.length === 0) {
+    if (
+        imageBuffer.length === 0
+    ) {
         throw new Error(
             "Gemini returned an empty image"
         );
@@ -338,89 +624,125 @@ const extractGeneratedImage = (
         buffer: imageBuffer,
         promptUsed,
         modelUsed,
+
         mimeType:
-            generatedImagePart.inlineData
-                ?.mimeType || "image/png",
+            generatedImagePart
+                .inlineData
+                ?.mimeType ||
+            "image/png",
     };
 };
 
-export const generateThumbnailImage = async (
-    data: GenerateThumbnailData,
-    tier: ImageModelTier = "flash"
-): Promise<GeneratedThumbnailImage> => {
-    const modelUsed =
-        getImageModel(tier);
+export const generateThumbnailImage =
+    async (
+        data: GenerateThumbnailData,
 
-    const promptUsed =
-        buildThumbnailPrompt(data);
+        tier: ImageModelTier =
+            "flash"
+    ): Promise<GeneratedThumbnailImage> => {
+        const modelUsed =
+            getImageModel(tier);
 
-    console.info(
-        `[Gemini Image] Generate using: ${modelUsed}`
-    );
+        const promptUsed =
+            buildThumbnailPrompt(data);
 
-    const response =
-        await gemini.models.generateContent({
-            model: modelUsed,
-            contents: promptUsed,
-            config: getGenerationConfig(
-                data.aspect_ratio
-            ),
-        });
+        console.info(
+            `[Gemini Image] Generate using: ${modelUsed}`
+        );
 
-    return extractGeneratedImage(
-        response,
-        promptUsed,
-        modelUsed
-    );
-};
+        const response =
+            await gemini.models.generateContent(
+                {
+                    model:
+                        modelUsed,
+
+                    contents:
+                        promptUsed,
+
+                    config:
+                        getGenerationConfig(
+                            data.aspect_ratio
+                        ),
+                }
+            );
+
+        return extractGeneratedImage(
+            response,
+            promptUsed,
+            modelUsed
+        );
+    };
 
 export const enhanceThumbnailWithPro =
     async (
         data: GenerateThumbnailData,
-        currentImageUrl: string
+
+        sourceInputs:
+            | SourceImageInput
+            | SourceImageInput[]
     ): Promise<GeneratedThumbnailImage> => {
         const modelUsed =
             getImageModel("pro");
 
-        const promptUsed =
-            buildProEnhancementPrompt(data);
+        const sourceImages =
+            await resolveSourceImages(
+                sourceInputs
+            );
 
-        const sourceImage =
-            await readSourceImage(
-                currentImageUrl
+        const promptUsed =
+            buildProEnhancementPrompt(
+                data,
+                sourceImages.length
             );
 
         console.info(
             `[Gemini Image] Pro enhance using: ${modelUsed}`
         );
 
+        console.info(
+            `[Gemini Image] Reference images: ${sourceImages.length}`
+        );
+
         const response =
-            await gemini.models.generateContent({
-                model: modelUsed,
+            await gemini.models.generateContent(
+                {
+                    model:
+                        modelUsed,
 
-                contents: [
-                    {
-                        role: "user",
+                    contents: [
+                        {
+                            role: "user",
 
-                        parts: [
-                            {
-                                text: promptUsed,
-                            },
-                            {
-                                inlineData: {
-                                    data: sourceImage.data,
-                                    mimeType:
-                                        sourceImage.mimeType,
+                            parts: [
+                                {
+                                    text:
+                                        promptUsed,
                                 },
-                            },
-                        ],
-                    },
-                ],
 
-                config: getGenerationConfig(
-                    data.aspect_ratio
-                ),
-            });
+                                ...sourceImages.map(
+                                    (
+                                        sourceImage
+                                    ) => ({
+                                        inlineData:
+                                        {
+                                            data:
+                                                sourceImage.data,
+
+                                            mimeType:
+                                                sourceImage.mimeType,
+                                        },
+                                    })
+                                ),
+                            ],
+                        },
+                    ],
+
+                    config:
+                        getGenerationConfig(
+                            data.aspect_ratio
+                        ),
+                }
+            );
 
         return extractGeneratedImage(
             response,
