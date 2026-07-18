@@ -2,18 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
 import {
     MenuIcon,
     XIcon,
 } from "lucide-react";
+
 import {
     useEffect,
     useState,
 } from "react";
+
 import {
     AnimatePresence,
     motion,
 } from "motion/react";
+
 import {
     usePathname,
     useRouter,
@@ -44,12 +48,15 @@ const navigationItems: NavigationItem[] = [
     },
     {
         label: "About",
-        href: "/#about",
-        guestOnly: true,
+        href: "/about",
+    },
+    {
+        label: "Pricing",
+        href: "/pricing",
     },
     {
         label: "Contact us",
-        href: "/#contact",
+        href: "/contact",
     },
 ];
 
@@ -67,7 +74,9 @@ const isNavigationActive = (
 
     return (
         pathname === href ||
-        pathname.startsWith(`${href}/`)
+        pathname.startsWith(
+            `${href}/`
+        )
     );
 };
 
@@ -98,21 +107,35 @@ export default function Navbar() {
     ] = useState(false);
 
     const visibleNavigationItems =
-        navigationItems.filter((item) => {
-            if (item.protected && !isLoggedIn) {
-                return false;
-            }
+        navigationItems.filter(
+            (item) => {
+                if (
+                    item.protected &&
+                    !isLoggedIn
+                ) {
+                    return false;
+                }
 
-            if (item.guestOnly && isLoggedIn) {
-                return false;
-            }
+                if (
+                    item.guestOnly &&
+                    isLoggedIn
+                ) {
+                    return false;
+                }
 
-            return true;
-        });
+                return true;
+            }
+        );
 
     const userInitial =
-        user?.name?.trim().charAt(0).toUpperCase() ||
-        user?.email?.trim().charAt(0).toUpperCase() ||
+        user?.name
+            ?.trim()
+            .charAt(0)
+            .toUpperCase() ||
+        user?.email
+            ?.trim()
+            .charAt(0)
+            .toUpperCase() ||
         "U";
 
     useEffect(() => {
@@ -128,7 +151,8 @@ export default function Navbar() {
         const previousOverflow =
             document.body.style.overflow;
 
-        document.body.style.overflow = "hidden";
+        document.body.style.overflow =
+            "hidden";
 
         return () => {
             document.body.style.overflow =
@@ -142,7 +166,12 @@ export default function Navbar() {
         ) => {
             const target = event.target;
 
-            if (!(target instanceof Element)) {
+            if (
+                !(
+                    target instanceof
+                    Element
+                )
+            ) {
                 return;
             }
 
@@ -151,7 +180,9 @@ export default function Navbar() {
                     "[data-profile-menu]"
                 )
             ) {
-                setIsProfileMenuOpen(false);
+                setIsProfileMenuOpen(
+                    false
+                );
             }
         };
 
@@ -235,14 +266,20 @@ export default function Navbar() {
 
                             return (
                                 <Link
-                                    key={item.label}
-                                    href={item.href}
+                                    key={
+                                        item.label
+                                    }
+                                    href={
+                                        item.href
+                                    }
                                     className={`transition ${isActive
                                         ? "text-pink-500"
                                         : "text-white hover:text-pink-500"
                                         }`}
                                 >
-                                    {item.label}
+                                    {
+                                        item.label
+                                    }
                                 </Link>
                             );
                         }
@@ -262,7 +299,9 @@ export default function Navbar() {
                                     type="button"
                                     onClick={() =>
                                         setIsProfileMenuOpen(
-                                            (currentValue) =>
+                                            (
+                                                currentValue
+                                            ) =>
                                                 !currentValue
                                         )
                                     }
@@ -273,7 +312,9 @@ export default function Navbar() {
                                     }
                                     className="flex size-9 items-center justify-center rounded-full border-2 border-white/10 bg-white/20 text-sm font-medium text-white transition hover:border-pink-500/60"
                                 >
-                                    {userInitial}
+                                    {
+                                        userInitial
+                                    }
                                 </button>
 
                                 <AnimatePresence>
@@ -302,11 +343,15 @@ export default function Navbar() {
                                         >
                                             <div className="border-b border-white/10 px-3 py-2">
                                                 <p className="truncate text-sm font-medium text-white">
-                                                    {user.name}
+                                                    {
+                                                        user.name
+                                                    }
                                                 </p>
 
                                                 <p className="truncate text-xs text-zinc-400">
-                                                    {user.email}
+                                                    {
+                                                        user.email
+                                                    }
                                                 </p>
                                             </div>
 
@@ -315,7 +360,8 @@ export default function Navbar() {
                                                 role="menuitem"
                                                 className="mt-1 block rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/10 hover:text-white"
                                             >
-                                                My Generations
+                                                My
+                                                Generations
                                             </Link>
 
                                             <button
@@ -324,7 +370,9 @@ export default function Navbar() {
                                                 onClick={() =>
                                                     void handleLogout()
                                                 }
-                                                disabled={isLoggingOut}
+                                                disabled={
+                                                    isLoggingOut
+                                                }
                                                 className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-pink-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 {isLoggingOut
@@ -357,7 +405,9 @@ export default function Navbar() {
                     <button
                         type="button"
                         onClick={() =>
-                            setIsMobileMenuOpen(true)
+                            setIsMobileMenuOpen(
+                                true
+                            )
                         }
                         aria-label="Open navigation menu"
                         aria-expanded={
@@ -402,8 +452,12 @@ export default function Navbar() {
 
                                 return (
                                     <Link
-                                        key={item.label}
-                                        href={item.href}
+                                        key={
+                                            item.label
+                                        }
+                                        href={
+                                            item.href
+                                        }
                                         onClick={() =>
                                             setIsMobileMenuOpen(
                                                 false
@@ -414,7 +468,9 @@ export default function Navbar() {
                                             : "hover:text-pink-500"
                                             }`}
                                     >
-                                        {item.label}
+                                        {
+                                            item.label
+                                        }
                                     </Link>
                                 );
                             }
@@ -427,7 +483,9 @@ export default function Navbar() {
                                     onClick={() =>
                                         void handleLogout()
                                     }
-                                    disabled={isLoggingOut}
+                                    disabled={
+                                        isLoggingOut
+                                    }
                                     className="transition hover:text-pink-500 disabled:opacity-60"
                                 >
                                     {isLoggingOut
@@ -454,12 +512,16 @@ export default function Navbar() {
                         <button
                             type="button"
                             onClick={() =>
-                                setIsMobileMenuOpen(false)
+                                setIsMobileMenuOpen(
+                                    false
+                                )
                             }
                             aria-label="Close navigation menu"
                             className="flex size-10 items-center justify-center rounded-md bg-pink-600 p-1 text-white transition hover:bg-pink-700 active:ring-3 active:ring-white"
                         >
-                            <XIcon aria-hidden="true" />
+                            <XIcon
+                                aria-hidden="true"
+                            />
                         </button>
                     </motion.div>
                 )}
