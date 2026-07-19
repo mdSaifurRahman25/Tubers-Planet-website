@@ -1,27 +1,23 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-
-import {
-    MenuIcon,
-    XIcon,
-} from "lucide-react";
-
 import {
     useEffect,
     useState,
 } from "react";
-
-import {
-    AnimatePresence,
-    motion,
-} from "motion/react";
-
+import Image from "next/image";
+import Link from "next/link";
 import {
     usePathname,
     useRouter,
 } from "next/navigation";
+import {
+    MenuIcon,
+    XIcon,
+} from "lucide-react";
+import {
+    AnimatePresence,
+    motion,
+} from "motion/react";
 
 import { useAuth } from "@/context/AuthContext";
 
@@ -81,8 +77,11 @@ const isNavigationActive = (
 };
 
 export default function Navbar() {
-    const pathname = usePathname();
-    const router = useRouter();
+    const pathname =
+        usePathname();
+
+    const router =
+        useRouter();
 
     const {
         user,
@@ -139,8 +138,13 @@ export default function Navbar() {
         "U";
 
     useEffect(() => {
-        setIsMobileMenuOpen(false);
-        setIsProfileMenuOpen(false);
+        setIsMobileMenuOpen(
+            false
+        );
+
+        setIsProfileMenuOpen(
+            false
+        );
     }, [pathname]);
 
     useEffect(() => {
@@ -149,7 +153,8 @@ export default function Navbar() {
         }
 
         const previousOverflow =
-            document.body.style.overflow;
+            document.body.style
+                .overflow;
 
         document.body.style.overflow =
             "hidden";
@@ -164,7 +169,8 @@ export default function Navbar() {
         const closeProfileMenu = (
             event: MouseEvent
         ) => {
-            const target = event.target;
+            const target =
+                event.target;
 
             if (
                 !(
@@ -199,25 +205,35 @@ export default function Navbar() {
         };
     }, []);
 
-    const handleLogout = async () => {
-        if (isLoggingOut) {
-            return;
-        }
+    const handleLogout =
+        async () => {
+            if (isLoggingOut) {
+                return;
+            }
 
-        try {
-            setIsLoggingOut(true);
+            try {
+                setIsLoggingOut(
+                    true
+                );
 
-            await logout();
+                await logout();
 
-            setIsProfileMenuOpen(false);
-            setIsMobileMenuOpen(false);
+                setIsProfileMenuOpen(
+                    false
+                );
 
-            router.push("/");
-            router.refresh();
-        } finally {
-            setIsLoggingOut(false);
-        }
-    };
+                setIsMobileMenuOpen(
+                    false
+                );
+
+                router.push("/");
+                router.refresh();
+            } finally {
+                setIsLoggingOut(
+                    false
+                );
+            }
+        };
 
     return (
         <>
@@ -387,12 +403,21 @@ export default function Navbar() {
 
                     {!isAuthLoading &&
                         !isLoggedIn && (
-                            <Link
-                                href="/login"
-                                className="hidden rounded-full bg-pink-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-pink-700 active:scale-95 md:block"
-                            >
-                                Get Started
-                            </Link>
+                            <div className="hidden items-center gap-3 md:flex">
+                                <Link
+                                    href="/login"
+                                    className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-pink-500/50 hover:bg-white/5 hover:text-pink-300 active:scale-95"
+                                >
+                                    Login
+                                </Link>
+
+                                <Link
+                                    href="/register"
+                                    className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
+                                >
+                                    Get Started
+                                </Link>
+                            </div>
                         )}
 
                     {isAuthLoading && (
@@ -496,17 +521,36 @@ export default function Navbar() {
 
                         {!isAuthLoading &&
                             !isLoggedIn && (
-                                <Link
-                                    href="/login"
-                                    onClick={() =>
-                                        setIsMobileMenuOpen(
-                                            false
-                                        )
-                                    }
-                                    className="transition hover:text-pink-500"
-                                >
-                                    Login
-                                </Link>
+                                <div className="flex flex-col items-center gap-5">
+                                    <Link
+                                        href="/login"
+                                        onClick={() =>
+                                            setIsMobileMenuOpen(
+                                                false
+                                            )
+                                        }
+                                        className={`transition ${pathname ===
+                                            "/login"
+                                            ? "text-pink-500"
+                                            : "hover:text-pink-500"
+                                            }`}
+                                    >
+                                        Login
+                                    </Link>
+
+                                    <Link
+                                        href="/register"
+                                        onClick={() =>
+                                            setIsMobileMenuOpen(
+                                                false
+                                            )
+                                        }
+                                        className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-7 py-3 text-base font-medium text-white transition hover:opacity-90"
+                                    >
+                                        Create
+                                        Account
+                                    </Link>
+                                </div>
                             )}
 
                         <button
