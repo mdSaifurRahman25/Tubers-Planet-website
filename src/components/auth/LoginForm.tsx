@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
     ArrowLeft,
+    CircleCheckBig,
     Eye,
     EyeOff,
     LoaderCircle,
@@ -60,6 +61,47 @@ export default function LoginForm() {
         setIsSubmitting,
     ] = useState(false);
 
+    const [
+        passwordResetSuccess,
+        setPasswordResetSuccess,
+    ] = useState(false);
+
+    /*
+     * Password reset সফল হওয়ার পরে user এই URL-এ আসবে:
+     *
+     * /login?passwordReset=success
+     *
+     * Query parameter পাওয়া গেলে success message দেখানো হবে।
+     * এরপর URL থেকে query parameter সরিয়ে দেওয়া হবে, যাতে
+     * refresh করলে message আবার না আসে।
+     */
+    useEffect(() => {
+        const searchParams =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const resetStatus =
+            searchParams.get(
+                "passwordReset"
+            );
+
+        if (
+            resetStatus ===
+            "success"
+        ) {
+            setPasswordResetSuccess(
+                true
+            );
+
+            window.history.replaceState(
+                window.history.state,
+                "",
+                "/login"
+            );
+        }
+    }, []);
+
     /*
      * Logged-in user login page-এ এলে
      * generate page-এ পাঠানো হবে।
@@ -94,7 +136,8 @@ export default function LoginForm() {
                 ...currentData,
 
                 [name]:
-                    type === "checkbox"
+                    type ===
+                        "checkbox"
                         ? checked
                         : value,
             })
@@ -163,13 +206,6 @@ export default function LoginForm() {
         }
     };
 
-    const handleForgotPassword =
-        () => {
-            toast(
-                "Password reset will be added in the next step."
-            );
-        };
-
     return (
         <>
             <SoftBackdrop />
@@ -201,7 +237,8 @@ export default function LoginForm() {
                         </h1>
 
                         <p className="mt-2 text-sm leading-6 text-white/80 sm:text-base">
-                            Sign in to your Thumblify account
+                            Sign in to your
+                            Thumblify account
                         </p>
                     </header>
 
@@ -211,6 +248,34 @@ export default function LoginForm() {
                         }
                         className="px-6 py-8 sm:px-10 sm:py-10"
                     >
+                        {passwordResetSuccess ? (
+                            <div
+                                role="status"
+                                className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-300"
+                            >
+                                <CircleCheckBig
+                                    size={20}
+                                    className="mt-0.5 shrink-0"
+                                    aria-hidden="true"
+                                />
+
+                                <div>
+                                    <p className="text-sm font-semibold">
+                                        Password reset
+                                        successful
+                                    </p>
+
+                                    <p className="mt-1 text-sm leading-5 text-emerald-200/80">
+                                        Your password
+                                        has been
+                                        updated. Sign
+                                        in using your
+                                        new password.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div>
                             <label
                                 htmlFor="email"
@@ -342,18 +407,23 @@ export default function LoginForm() {
                                 Remember Me
                             </label>
 
-                            <button
-                                type="button"
-                                onClick={
-                                    handleForgotPassword
-                                }
-                                disabled={
+                            <Link
+                                href="/forgot-password"
+                                aria-disabled={
                                     isSubmitting
                                 }
-                                className="text-sm font-medium text-pink-300 transition hover:text-pink-200 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                tabIndex={
+                                    isSubmitting
+                                        ? -1
+                                        : undefined
+                                }
+                                className={`text-sm font-medium text-pink-300 transition hover:text-pink-200 hover:underline ${isSubmitting
+                                    ? "pointer-events-none cursor-not-allowed opacity-50"
+                                    : ""
+                                    }`}
                             >
                                 Forgot Password?
-                            </button>
+                            </Link>
                         </div>
 
                         <button

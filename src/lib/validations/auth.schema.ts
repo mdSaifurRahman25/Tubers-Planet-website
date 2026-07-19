@@ -23,6 +23,14 @@ const passwordSchema = z
         "Password cannot exceed 72 characters"
     );
 
+const otpSchema = z
+    .string()
+    .trim()
+    .regex(
+        /^\d{6}$/,
+        "Please enter a valid 6-digit verification code"
+    );
+
 /*
  * WhatsApp number optional।
  *
@@ -74,6 +82,9 @@ const whatsappNumberSchema =
             .optional()
     );
 
+/*
+ * Account registration validation।
+ */
 export const registerSchema =
     z.object({
         name: z
@@ -112,6 +123,9 @@ export const registerSchema =
             ),
     });
 
+/*
+ * Account login validation।
+ */
 export const loginSchema =
     z.object({
         email:
@@ -129,8 +143,8 @@ export const loginSchema =
             ),
 
         /*
-         * বর্তমান Login form এখনো rememberMe না পাঠালেও
-         * validation fail করবে না।
+         * Frontend rememberMe না পাঠালেও
+         * default false হবে।
          */
         rememberMe: z
             .boolean()
@@ -138,16 +152,70 @@ export const loginSchema =
             .default(false),
     });
 
+/*
+ * New account email verification OTP।
+ */
 export const verifyEmailSchema =
     z.object({
-        otp: z
-            .string()
-            .trim()
-            .regex(
-                /^\d{6}$/,
-                "Please enter a valid 6-digit verification code"
-            ),
+        otp:
+            otpSchema,
     });
+
+/*
+ * Forgot Password form।
+ *
+ * User শুধু account email submit করবে।
+ */
+export const forgotPasswordSchema =
+    z.object({
+        email:
+            emailSchema,
+    });
+
+/*
+ * Password Reset OTP verification।
+ */
+export const verifyPasswordResetOtpSchema =
+    z.object({
+        otp:
+            otpSchema,
+    });
+
+/*
+ * OTP verification-এর পরে নতুন password সেট করবে।
+ *
+ * newPassword এবং confirmPassword একই না হলে
+ * confirmPassword field-এ validation error দেখাবে।
+ */
+export const resetPasswordSchema =
+    z
+        .object({
+            newPassword:
+                passwordSchema,
+
+            confirmPassword: z
+                .string()
+                .min(
+                    1,
+                    "Please confirm your new password"
+                )
+                .max(
+                    72,
+                    "Password cannot exceed 72 characters"
+                ),
+        })
+        .refine(
+            (data) =>
+                data.newPassword ===
+                data.confirmPassword,
+            {
+                message:
+                    "Passwords do not match",
+                path: [
+                    "confirmPassword",
+                ],
+            }
+        );
 
 export type RegisterInput =
     z.infer<
@@ -162,4 +230,19 @@ export type LoginInput =
 export type VerifyEmailInput =
     z.infer<
         typeof verifyEmailSchema
+    >;
+
+export type ForgotPasswordInput =
+    z.infer<
+        typeof forgotPasswordSchema
+    >;
+
+export type VerifyPasswordResetOtpInput =
+    z.infer<
+        typeof verifyPasswordResetOtpSchema
+    >;
+
+export type ResetPasswordInput =
+    z.infer<
+        typeof resetPasswordSchema
     >;
