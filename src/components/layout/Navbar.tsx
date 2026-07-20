@@ -8,7 +8,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
     usePathname,
-    useRouter,
 } from "next/navigation";
 import {
     MenuIcon,
@@ -19,13 +18,14 @@ import {
     motion,
 } from "motion/react";
 
-import { useAuth } from "@/context/AuthContext";
+import {
+    getAppUrl,
+} from "@/lib/app-url";
 
 interface NavigationItem {
     label: string;
     href: string;
-    protected?: boolean;
-    guestOnly?: boolean;
+    external?: boolean;
 }
 
 const navigationItems: NavigationItem[] = [
@@ -35,12 +35,10 @@ const navigationItems: NavigationItem[] = [
     },
     {
         label: "Generate",
-        href: "/generate",
-    },
-    {
-        label: "My Generations",
-        href: "/generations",
-        protected: true,
+        href: getAppUrl(
+            "/generate"
+        ),
+        external: true,
     },
     {
         label: "About",
@@ -58,20 +56,20 @@ const navigationItems: NavigationItem[] = [
 
 const isNavigationActive = (
     pathname: string,
-    href: string
+    item: NavigationItem
 ): boolean => {
-    if (href === "/") {
-        return pathname === "/";
-    }
-
-    if (href.startsWith("/#")) {
+    if (item.external) {
         return false;
     }
 
+    if (item.href === "/") {
+        return pathname === "/";
+    }
+
     return (
-        pathname === href ||
+        pathname === item.href ||
         pathname.startsWith(
-            `${href}/`
+            `${item.href}/`
         )
     );
 };
@@ -80,69 +78,13 @@ export default function Navbar() {
     const pathname =
         usePathname();
 
-    const router =
-        useRouter();
-
-    const {
-        user,
-        isLoggedIn,
-        isAuthLoading,
-        logout,
-    } = useAuth();
-
     const [
         isMobileMenuOpen,
         setIsMobileMenuOpen,
     ] = useState(false);
 
-    const [
-        isProfileMenuOpen,
-        setIsProfileMenuOpen,
-    ] = useState(false);
-
-    const [
-        isLoggingOut,
-        setIsLoggingOut,
-    ] = useState(false);
-
-    const visibleNavigationItems =
-        navigationItems.filter(
-            (item) => {
-                if (
-                    item.protected &&
-                    !isLoggedIn
-                ) {
-                    return false;
-                }
-
-                if (
-                    item.guestOnly &&
-                    isLoggedIn
-                ) {
-                    return false;
-                }
-
-                return true;
-            }
-        );
-
-    const userInitial =
-        user?.name
-            ?.trim()
-            .charAt(0)
-            .toUpperCase() ||
-        user?.email
-            ?.trim()
-            .charAt(0)
-            .toUpperCase() ||
-        "U";
-
     useEffect(() => {
         setIsMobileMenuOpen(
-            false
-        );
-
-        setIsProfileMenuOpen(
             false
         );
     }, [pathname]);
@@ -165,75 +107,99 @@ export default function Navbar() {
         };
     }, [isMobileMenuOpen]);
 
-    useEffect(() => {
-        const closeProfileMenu = (
-            event: MouseEvent
-        ) => {
-            const target =
-                event.target;
+    const loginUrl =
+        getAppUrl("/login");
 
-            if (
-                !(
-                    target instanceof
-                    Element
-                )
-            ) {
-                return;
-            }
+    const registerUrl =
+        getAppUrl("/register");
 
-            if (
-                !target.closest(
-                    "[data-profile-menu]"
-                )
-            ) {
-                setIsProfileMenuOpen(
-                    false
-                );
-            }
-        };
-
-        document.addEventListener(
-            "mousedown",
-            closeProfileMenu
-        );
-
-        return () => {
-            document.removeEventListener(
-                "mousedown",
-                closeProfileMenu
+    const renderDesktopNavigationItem = (
+        item: NavigationItem
+    ) => {
+        const isActive =
+            isNavigationActive(
+                pathname,
+                item
             );
-        };
-    }, []);
 
-    const handleLogout =
-        async () => {
-            if (isLoggingOut) {
-                return;
-            }
+        const className = `transition ${isActive
+            ? "text-pink-500"
+            : "text-white hover:text-pink-500"
+            }`;
 
-            try {
-                setIsLoggingOut(
-                    true
-                );
+        if (item.external) {
+            return (
+                <a
+                    key={item.label}
+                    href={item.href}
+                    className={
+                        className
+                    }
+                >
+                    {item.label}
+                </a>
+            );
+        }
 
-                await logout();
+        return (
+            <Link
+                key={item.label}
+                href={item.href}
+                className={className}
+            >
+                {item.label}
+            </Link>
+        );
+    };
 
-                setIsProfileMenuOpen(
-                    false
-                );
+    const renderMobileNavigationItem = (
+        item: NavigationItem
+    ) => {
+        const isActive =
+            isNavigationActive(
+                pathname,
+                item
+            );
 
-                setIsMobileMenuOpen(
-                    false
-                );
+        const className = `transition ${isActive
+            ? "text-pink-500"
+            : "hover:text-pink-500"
+            }`;
 
-                router.push("/");
-                router.refresh();
-            } finally {
-                setIsLoggingOut(
-                    false
-                );
-            }
-        };
+        if (item.external) {
+            return (
+                <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={() =>
+                        setIsMobileMenuOpen(
+                            false
+                        )
+                    }
+                    className={
+                        className
+                    }
+                >
+                    {item.label}
+                </a>
+            );
+        }
+
+        return (
+            <Link
+                key={item.label}
+                href={item.href}
+                onClick={() =>
+                    setIsMobileMenuOpen(
+                        false
+                    )
+                }
+                className={className}
+            >
+                {item.label}
+            </Link>
+        );
+    };
 
     return (
         <>
@@ -254,7 +220,6 @@ export default function Navbar() {
                 }}
                 className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-black/40 px-6 py-4 backdrop-blur-md md:px-16 lg:px-24 xl:px-32"
             >
-                {/* Logo */}
                 <Link
                     href="/"
                     aria-label="Go to Thumblify homepage"
@@ -270,162 +235,28 @@ export default function Navbar() {
                     />
                 </Link>
 
-                {/* Desktop navigation */}
                 <div className="hidden items-center gap-8 md:flex">
-                    {visibleNavigationItems.map(
-                        (item) => {
-                            const isActive =
-                                isNavigationActive(
-                                    pathname,
-                                    item.href
-                                );
-
-                            return (
-                                <Link
-                                    key={
-                                        item.label
-                                    }
-                                    href={
-                                        item.href
-                                    }
-                                    className={`transition ${isActive
-                                        ? "text-pink-500"
-                                        : "text-white hover:text-pink-500"
-                                        }`}
-                                >
-                                    {
-                                        item.label
-                                    }
-                                </Link>
-                            );
-                        }
+                    {navigationItems.map(
+                        renderDesktopNavigationItem
                     )}
                 </div>
 
-                {/* Account controls */}
                 <div className="flex items-center gap-3">
-                    {!isAuthLoading &&
-                        isLoggedIn &&
-                        user && (
-                            <div
-                                data-profile-menu
-                                className="relative"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setIsProfileMenuOpen(
-                                            (
-                                                currentValue
-                                            ) =>
-                                                !currentValue
-                                        )
-                                    }
-                                    aria-label="Open profile menu"
-                                    aria-haspopup="menu"
-                                    aria-expanded={
-                                        isProfileMenuOpen
-                                    }
-                                    className="flex size-9 items-center justify-center rounded-full border-2 border-white/10 bg-white/20 text-sm font-medium text-white transition hover:border-pink-500/60"
-                                >
-                                    {
-                                        userInitial
-                                    }
-                                </button>
+                    <div className="hidden items-center gap-3 md:flex">
+                        <a
+                            href={loginUrl}
+                            className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-pink-500/50 hover:bg-white/5 hover:text-pink-300 active:scale-95"
+                        >
+                            Login
+                        </a>
 
-                                <AnimatePresence>
-                                    {isProfileMenuOpen && (
-                                        <motion.div
-                                            role="menu"
-                                            initial={{
-                                                y: -8,
-                                                opacity: 0,
-                                                scale: 0.96,
-                                            }}
-                                            animate={{
-                                                y: 0,
-                                                opacity: 1,
-                                                scale: 1,
-                                            }}
-                                            exit={{
-                                                y: -8,
-                                                opacity: 0,
-                                                scale: 0.96,
-                                            }}
-                                            transition={{
-                                                duration: 0.15,
-                                            }}
-                                            className="absolute top-full right-0 mt-3 w-52 overflow-hidden rounded-xl border border-white/10 bg-zinc-950 p-2 shadow-2xl"
-                                        >
-                                            <div className="border-b border-white/10 px-3 py-2">
-                                                <p className="truncate text-sm font-medium text-white">
-                                                    {
-                                                        user.name
-                                                    }
-                                                </p>
-
-                                                <p className="truncate text-xs text-zinc-400">
-                                                    {
-                                                        user.email
-                                                    }
-                                                </p>
-                                            </div>
-
-                                            <Link
-                                                href="/generations"
-                                                role="menuitem"
-                                                className="mt-1 block rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/10 hover:text-white"
-                                            >
-                                                My
-                                                Generations
-                                            </Link>
-
-                                            <button
-                                                type="button"
-                                                role="menuitem"
-                                                onClick={() =>
-                                                    void handleLogout()
-                                                }
-                                                disabled={
-                                                    isLoggingOut
-                                                }
-                                                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-pink-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                            >
-                                                {isLoggingOut
-                                                    ? "Logging out..."
-                                                    : "Logout"}
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        )}
-
-                    {!isAuthLoading &&
-                        !isLoggedIn && (
-                            <div className="hidden items-center gap-3 md:flex">
-                                <Link
-                                    href="/login"
-                                    className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-pink-500/50 hover:bg-white/5 hover:text-pink-300 active:scale-95"
-                                >
-                                    Login
-                                </Link>
-
-                                <Link
-                                    href="/register"
-                                    className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
-                                >
-                                    Get Started
-                                </Link>
-                            </div>
-                        )}
-
-                    {isAuthLoading && (
-                        <div
-                            aria-label="Loading account"
-                            className="size-9 animate-pulse rounded-full bg-white/10"
-                        />
-                    )}
+                        <a
+                            href={registerUrl}
+                            className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
+                        >
+                            Get Started
+                        </a>
+                    </div>
 
                     <button
                         type="button"
@@ -448,9 +279,8 @@ export default function Navbar() {
                 </div>
             </motion.nav>
 
-            {/* Mobile navigation */}
             <AnimatePresence>
-                {isMobileMenuOpen && (
+                {isMobileMenuOpen ? (
                     <motion.div
                         initial={{
                             x: "-100%",
@@ -465,93 +295,37 @@ export default function Navbar() {
                             duration: 0.3,
                             ease: "easeInOut",
                         }}
-                        className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-8 bg-black/80 text-lg text-white backdrop-blur-md md:hidden"
+                        className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 bg-black/90 text-lg text-white backdrop-blur-md md:hidden"
                     >
-                        {visibleNavigationItems.map(
-                            (item) => {
-                                const isActive =
-                                    isNavigationActive(
-                                        pathname,
-                                        item.href
-                                    );
-
-                                return (
-                                    <Link
-                                        key={
-                                            item.label
-                                        }
-                                        href={
-                                            item.href
-                                        }
-                                        onClick={() =>
-                                            setIsMobileMenuOpen(
-                                                false
-                                            )
-                                        }
-                                        className={`transition ${isActive
-                                            ? "text-pink-500"
-                                            : "hover:text-pink-500"
-                                            }`}
-                                    >
-                                        {
-                                            item.label
-                                        }
-                                    </Link>
-                                );
-                            }
+                        {navigationItems.map(
+                            renderMobileNavigationItem
                         )}
 
-                        {!isAuthLoading &&
-                            isLoggedIn && (
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        void handleLogout()
-                                    }
-                                    disabled={
-                                        isLoggingOut
-                                    }
-                                    className="transition hover:text-pink-500 disabled:opacity-60"
-                                >
-                                    {isLoggingOut
-                                        ? "Logging out..."
-                                        : "Logout"}
-                                </button>
-                            )}
+                        <div className="flex flex-col items-center gap-5">
+                            <a
+                                href={loginUrl}
+                                onClick={() =>
+                                    setIsMobileMenuOpen(
+                                        false
+                                    )
+                                }
+                                className="transition hover:text-pink-500"
+                            >
+                                Login
+                            </a>
 
-                        {!isAuthLoading &&
-                            !isLoggedIn && (
-                                <div className="flex flex-col items-center gap-5">
-                                    <Link
-                                        href="/login"
-                                        onClick={() =>
-                                            setIsMobileMenuOpen(
-                                                false
-                                            )
-                                        }
-                                        className={`transition ${pathname ===
-                                            "/login"
-                                            ? "text-pink-500"
-                                            : "hover:text-pink-500"
-                                            }`}
-                                    >
-                                        Login
-                                    </Link>
-
-                                    <Link
-                                        href="/register"
-                                        onClick={() =>
-                                            setIsMobileMenuOpen(
-                                                false
-                                            )
-                                        }
-                                        className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-7 py-3 text-base font-medium text-white transition hover:opacity-90"
-                                    >
-                                        Create
-                                        Account
-                                    </Link>
-                                </div>
-                            )}
+                            <a
+                                href={registerUrl}
+                                onClick={() =>
+                                    setIsMobileMenuOpen(
+                                        false
+                                    )
+                                }
+                                className="rounded-full bg-gradient-to-r from-pink-600 to-purple-600 px-7 py-3 text-base font-medium text-white transition hover:opacity-90"
+                            >
+                                Create Account
+                            </a>
+                        </div>
 
                         <button
                             type="button"
@@ -568,7 +342,7 @@ export default function Navbar() {
                             />
                         </button>
                     </motion.div>
-                )}
+                ) : null}
             </AnimatePresence>
         </>
     );

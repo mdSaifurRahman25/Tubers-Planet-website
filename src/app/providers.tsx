@@ -1,18 +1,24 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Toaster } from "react-hot-toast";
+import type {
+    ReactNode,
+} from "react";
+
+import {
+    Toaster,
+} from "react-hot-toast";
 
 import LenisScroll from "@/components/providers/LenisScroll";
-import { AuthProvider } from "@/context/AuthContext";
+
+interface ProvidersProps {
+    children: ReactNode;
+}
 
 export default function Providers({
     children,
-}: {
-    children: ReactNode;
-}) {
+}: Readonly<ProvidersProps>) {
     return (
-        <AuthProvider>
+        <>
             <LenisScroll />
 
             {children}
@@ -20,9 +26,20 @@ export default function Providers({
             <Toaster
                 position="top-center"
                 toastOptions={{
-                    duration: 3500,
+                    duration: 4000,
+
+                    style: {
+                        background:
+                            "#18181b",
+
+                        color:
+                            "#ffffff",
+
+                        border:
+                            "1px solid rgba(255, 255, 255, 0.1)",
+                    },
                 }}
             />
-        </AuthProvider>
+        </>
     );
 }
