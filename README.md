@@ -1,9 +1,17 @@
 
+/dashboard
+/generate
+/generations
+/credits
+/billing
+/profile
+/support
 
-update: 
-src/lib/db/connect-db.ts
-src/lib/auth/password.ts
-src/models/Session.ts
-src/app/providers.tsx
-src/app/layout.tsx
-src/app/(dashboard)/layout.tsx
+1. src/types/dashboard.types.ts
+2. src/config/dashboard-navigation.ts
+3. src/components/dashboard/DashboardUserMenu.tsx
+4. src/components/dashboard/DashboardSidebar.tsx
+5. src/components/dashboard/DashboardHeader.tsx
+6. src/components/dashboard/DashboardShell.tsx
+7. src/app/(dashboard)/layout.tsx
+8. src/app/(dashboard)/dashboard/page.tsx

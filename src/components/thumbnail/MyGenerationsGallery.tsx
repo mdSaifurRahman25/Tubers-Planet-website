@@ -490,7 +490,7 @@ const getVisiblePageNumbers = (
     );
 };
 
-export default function MyGenerationGallery() {
+export default function MyGenerationsGallery() {
     const router = useRouter();
 
     const {
@@ -557,7 +557,7 @@ export default function MyGenerationGallery() {
             setIsLoading(false);
 
             router.replace(
-                "/login?next=/my-generation"
+                "/login?next=/generations"
             );
 
             return;
@@ -1017,7 +1017,7 @@ export default function MyGenerationGallery() {
         <>
             <SoftBackdrop />
 
-            <main className="relative z-10 min-h-screen px-5 pt-32 pb-20 sm:px-8 md:px-12 lg:px-16 xl:px-24">
+            <main className="relative z-10 min-h-screen px-5 pt-24 pb-20 sm:px-8 md:px-12 lg:px-16 xl:px-24">
                 <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-zinc-200">
