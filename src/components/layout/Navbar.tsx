@@ -38,8 +38,8 @@ const navigationItems: NavigationItem[] = [
         href: "/generate",
     },
     {
-        label: "My Generation",
-        href: "/my-generation",
+        label: "My Generations",
+        href: "/generations",
         protected: true,
     },
     {
@@ -372,7 +372,7 @@ export default function Navbar() {
                                             </div>
 
                                             <Link
-                                                href="/my-generation"
+                                                href="/generations"
                                                 role="menuitem"
                                                 className="mt-1 block rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/10 hover:text-white"
                                             >

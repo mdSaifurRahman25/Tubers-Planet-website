@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import MyGenerationGallery from "@/components/thumbnail/MyGenerationGallery";
+import MyGenerationsGallery from "@/components/thumbnail/MyGenerationsGallery";
 
 export const metadata: Metadata = {
     title: "My Generations",
@@ -12,6 +12,8 @@ export const metadata: Metadata = {
     },
 };
 
-export default function MyGenerationPage() {
-    return <MyGenerationGallery />;
+export default function MyGenerationsPage() {
+    return (
+        <MyGenerationsGallery />
+    );
 }

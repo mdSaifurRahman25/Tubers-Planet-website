@@ -103,8 +103,8 @@ export default function LoginForm() {
     }, []);
 
     /*
-     * Logged-in user login page-এ এলে
-     * generate page-এ পাঠানো হবে।
+     * আগে থেকেই logged-in user login page-এ এলে
+     * সরাসরি dashboard page-এ পাঠানো হবে।
      */
     useEffect(() => {
         if (
@@ -112,7 +112,7 @@ export default function LoginForm() {
             user
         ) {
             router.replace(
-                "/generate"
+                "/dashboard"
             );
         }
     }, [
@@ -192,9 +192,13 @@ export default function LoginForm() {
                         formData.rememberMe,
                 });
 
+            /*
+             * Login সফল হলে authenticated app-এর
+             * default dashboard page-এ পাঠানো হবে।
+             */
             if (success) {
                 router.replace(
-                    "/generate"
+                    "/dashboard"
                 );
 
                 router.refresh();
